@@ -7,10 +7,6 @@ includes:
   - classifiers/ADM.yaml
   - backbones/Conv64F.yaml
 
-way_num: 5
-shot_num: 1
-query_num: 15
-
 classifier:
   name: ADM
   kwargs:
