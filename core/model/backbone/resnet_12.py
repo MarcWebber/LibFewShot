@@ -27,15 +27,15 @@ class BasicBlock(nn.Module):
     expansion = 1
 
     def __init__(
-        self,
-        inplanes,
-        planes,
-        stride=1,
-        downsample=None,
-        drop_rate=0.0,
-        drop_block=False,
-        block_size=1,
-        use_pool=True,
+            self,
+            inplanes,
+            planes,
+            stride=1,
+            downsample=None,
+            drop_rate=0.0,
+            drop_block=False,
+            block_size=1,
+            use_pool=True,
     ):
         super(BasicBlock, self).__init__()
         self.conv1 = conv3x3(inplanes, planes)
@@ -86,10 +86,10 @@ class BasicBlock(nn.Module):
                     1.0 - self.drop_rate,
                 )
                 gamma = (
-                    (1 - keep_rate)
-                    / self.block_size**2
-                    * feat_size**2
-                    / (feat_size - self.block_size + 1) ** 2
+                        (1 - keep_rate)
+                        / self.block_size ** 2
+                        * feat_size ** 2
+                        / (feat_size - self.block_size + 1) ** 2
                 )
                 out = self.DropBlock(out, gamma=gamma)
             else:
@@ -104,15 +104,15 @@ class BasicBlockWithoutResidual(nn.Module):
     expansion = 1
 
     def __init__(
-        self,
-        inplanes,
-        planes,
-        stride=1,
-        downsample=None,
-        drop_rate=0.0,
-        drop_block=False,
-        block_size=1,
-        use_pool=True,
+            self,
+            inplanes,
+            planes,
+            stride=1,
+            downsample=None,
+            drop_rate=0.0,
+            drop_block=False,
+            block_size=1,
+            use_pool=True,
     ):
         super(BasicBlockWithoutResidual, self).__init__()
         self.conv1 = conv3x3(inplanes, planes)
@@ -158,10 +158,10 @@ class BasicBlockWithoutResidual(nn.Module):
                     1.0 - self.drop_rate,
                 )
                 gamma = (
-                    (1 - keep_rate)
-                    / self.block_size**2
-                    * feat_size**2
-                    / (feat_size - self.block_size + 1) ** 2
+                        (1 - keep_rate)
+                        / self.block_size ** 2
+                        * feat_size ** 2
+                        / (feat_size - self.block_size + 1) ** 2
                 )
                 out = self.DropBlock(out, gamma=gamma)
             else:
@@ -174,15 +174,15 @@ class BasicBlockWithoutResidual(nn.Module):
 
 class ResNet(nn.Module):
     def __init__(
-        self,
-        blocks=[BasicBlock, BasicBlock, BasicBlock, BasicBlock],
-        planes=[64, 160, 320, 640],
-        keep_prob=1.0,
-        avg_pool=True,
-        drop_rate=0.1,
-        dropblock_size=5,
-        is_flatten=True,
-        maxpool_last2=True,
+            self,
+            blocks=[BasicBlock, BasicBlock, BasicBlock, BasicBlock],
+            planes=[64, 160, 320, 640],
+            keep_prob=1.0,
+            avg_pool=True,
+            drop_rate=0.1,
+            dropblock_size=5,
+            is_flatten=True,
+            maxpool_last2=True,
     ):
         self.inplanes = 3
         super(ResNet, self).__init__()
@@ -229,14 +229,14 @@ class ResNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def _make_layer(
-        self,
-        block,
-        planes,
-        stride=1,
-        drop_rate=0.0,
-        drop_block=False,
-        block_size=1,
-        use_pool=True,
+            self,
+            block,
+            planes,
+            stride=1,
+            drop_rate=0.0,
+            drop_block=False,
+            block_size=1,
+            use_pool=True,
     ):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
@@ -281,7 +281,7 @@ class ResNet(nn.Module):
 
 
 def resnet12(
-    keep_prob=1.0, avg_pool=True, is_flatten=True, maxpool_last2=True, **kwargs
+        keep_prob=1.0, avg_pool=True, is_flatten=True, maxpool_last2=True, **kwargs
 ):
     """Constructs a ResNet-12 model."""
     model = ResNet(
@@ -296,7 +296,7 @@ def resnet12(
 
 
 def resnet12woLSC(
-    keep_prob=1.0, avg_pool=True, is_flatten=True, maxpool_last2=True, **kwargs
+        keep_prob=1.0, avg_pool=True, is_flatten=True, maxpool_last2=True, **kwargs
 ):
     """Constructs a ResNet-12 model."""
     model = ResNet(

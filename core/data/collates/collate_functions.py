@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import itertools
-from collections import Iterable
+from typing import Iterable
 
 import torch
 
