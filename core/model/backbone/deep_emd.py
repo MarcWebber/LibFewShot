@@ -18,6 +18,7 @@ class DeepEMD(nn.Module):
             self.fc = nn.Linear(640, self.args.num_class)
 
     def forward(self, _input):
+        print(_input)
         if self.mode == 'meta':
             support, query = _input
             return self.emd_forward_1shot(support, query)
