@@ -32,7 +32,7 @@ includes:
   - headers/misc.yaml
   - headers/model.yaml
   - headers/optimizer.yaml
-  - classifiers/RENet.yaml
+  - classifiers/DeepEMD.yaml
   - backbones/resnet12.yaml
 log_interval: 100
 log_level: info

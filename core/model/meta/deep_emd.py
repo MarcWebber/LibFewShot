@@ -10,8 +10,8 @@ import torch.nn.functional as F
 class DeepEMD(MetaModel):
     # TODO: FIGURE OUT WHAT THIS ARG
     # def __init__(self, args, mode='meta'):
-    def __init__(self, mode='meta',**kwargs):
-        super(DeepEMD,self).__init__(**kwargs)
+    def __init__(self, mode='meta', **kwargs):
+        super(DeepEMD, self).__init__(**kwargs)
 
         self.mode = mode
         # self.args = args
@@ -37,7 +37,8 @@ class DeepEMD(MetaModel):
         # input is Tensor(10,3,84,84)
         print(_input)
         if self.mode == 'meta':
-            support, query = _input
+            support = _input
+            query = _input
             return self.emd_forward_1shot(support, query)
 
         elif self.mode == 'pre_train':
@@ -212,7 +213,6 @@ class DeepEMD(MetaModel):
         feature_list.append(feature.view(feature.shape[0], feature.shape[1], 1, -1))
         out = torch.cat(feature_list, dim=-1)
         return out
-
 
 # def deepemd(
 #         **kwargs
