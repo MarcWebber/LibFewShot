@@ -19,6 +19,8 @@ classifier:
     num_classes: 200
     temperature: 0.2
     temperature_attn: 5.0
+    mode: meta
+    norm: center
   name: DeepEMD
 data_root: ./data/fewshot/miniImageNet--ravi
 deterministic: true

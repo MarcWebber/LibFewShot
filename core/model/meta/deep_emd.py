@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from core.utils import accuracy
 from .meta_model import MetaModel
 from core.model.backbone.utils.deep_emd import emd_inference_opencv, emd_inference_qpth
 from core.model.backbone.resnet_12 import ResNet
@@ -10,10 +9,11 @@ import torch.nn.functional as F
 class DeepEMD(MetaModel):
     # TODO: FIGURE OUT WHAT THIS ARG
     # def __init__(self, args, mode='meta'):
-    def __init__(self, mode='meta', **kwargs):
+    def __init__(self, mode, norm, args,**kwargs):
         super(DeepEMD, self).__init__(**kwargs)
 
         self.mode = mode
+        self.norm = norm
         # self.args = args
         self.encoder = ResNet()
         if self.mode == 'pre_train':
@@ -34,11 +34,11 @@ class DeepEMD(MetaModel):
     #     return output,acc
 
     def forward(self, _input):
-        # input is Tensor(10,3,84,84)
-        print(_input)
+        # _input是一个list
+        # 查看_input
         if self.mode == 'meta':
-            support = _input
-            query = _input
+            support = _input[0]
+            query = _input[1]
             return self.emd_forward_1shot(support, query)
 
         elif self.mode == 'pre_train':
@@ -61,7 +61,7 @@ class DeepEMD(MetaModel):
         M = A.shape[0]
         N = B.shape[0]
 
-        B = F.adaptive_avg_pool2d(B, [1, 1])
+        B = F.adaptive_avg_pool2d(B, (1, 1))
         B = B.repeat(1, 1, A.shape[2], A.shape[3])
 
         A = A.unsqueeze(1)
@@ -153,7 +153,7 @@ class DeepEMD(MetaModel):
         return logitis
 
     def normalize_feature(self, x):
-        if self.args.norm == 'center':
+        if self.norm == 'center':
             x = x - x.mean(1).unsqueeze(1)
             return x
         else:
