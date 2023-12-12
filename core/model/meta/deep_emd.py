@@ -9,11 +9,10 @@ import torch.nn.functional as F
 class DeepEMD(MetaModel):
     # TODO: FIGURE OUT WHAT THIS ARG
     # def __init__(self, args, mode='meta'):
-    def __init__(self, mode, norm, args,**kwargs):
+    def __init__(self, mode, args,**kwargs):
         super(DeepEMD, self).__init__(**kwargs)
 
         self.mode = mode
-        self.norm = norm
         # self.args = args
         self.encoder = ResNet()
         if self.mode == 'pre_train':
@@ -153,7 +152,7 @@ class DeepEMD(MetaModel):
         return logitis
 
     def normalize_feature(self, x):
-        if self.norm == 'center':
+        if self.args.norm == 'center':
             x = x - x.mean(1).unsqueeze(1)
             return x
         else:

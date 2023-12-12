@@ -20,7 +20,19 @@ classifier:
     temperature: 0.2
     temperature_attn: 5.0
     mode: meta
-    norm: center
+    args:
+      way: 5
+      shot: 1
+      query: 15
+      deepemd: fcn
+      solver: opencv
+      num_patch: 9
+      sfc_lr: 0.1
+      sfc_bs: 4
+      temperature: 12.5
+      form: L2
+      l2_strength: 0.000001
+
   name: DeepEMD
 data_root: ./data/fewshot/miniImageNet--ravi
 deterministic: true
