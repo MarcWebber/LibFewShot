@@ -1,23 +1,40 @@
+import torch
 import torch.nn as nn
+from core.utils import accuracy
+from .meta_model import MetaModel
 from core.model.backbone.utils.deep_emd import emd_inference_opencv, emd_inference_qpth
 from core.model.backbone.resnet_12 import ResNet
+import torch.nn.functional as F
 
 
-class DeepEMD(nn.Module):
+class DeepEMD(MetaModel):
     # TODO: FIGURE OUT WHAT THIS ARG
     # def __init__(self, args, mode='meta'):
-    def __init__(self,  mode='meta'):
-        super().__init__()
+    def __init__(self, mode='meta',**kwargs):
+        super(DeepEMD,self).__init__(**kwargs)
 
         self.mode = mode
         # self.args = args
-
         self.encoder = ResNet()
-
         if self.mode == 'pre_train':
             self.fc = nn.Linear(640, self.args.num_class)
 
+    # def set_forward(self, batch):
+    #     image, global_target = batch
+    #     image = image.to(self.device)
+    #     # global_target = global_target.to(self.device)
+    #     # with torch.no_grad():
+    #     #     feat = self.emb_func(image)
+    #     # support_feat, query_feat, support_target, query_target = self.split_by_episode(
+    #     #     feat, mode=1
+    #     # )
+    #     # episode_size = support_feat.size(0)
+    #     # logits = self.emd_forward_1shot(support_feat, query_feat)
+    #     acc = accuracy(logits, query_target.contiguous().reshape(-1))
+    #     return output,acc
+
     def forward(self, _input):
+        # input is Tensor(10,3,84,84)
         print(_input)
         if self.mode == 'meta':
             support, query = _input
@@ -197,19 +214,20 @@ class DeepEMD(nn.Module):
         return out
 
 
-def deepemd(
-        **kwargs
-):
-    _model = DeepEMD(
-        # args=kwargs['args'],
-        **kwargs
-    )
-    return _model
-
-
-if __name__ == '__main__':
-    import torch
-    model = deepemd().cuda()
-    data = torch.rand(10, 3, 84, 84).cuda()
-    output = model(data)
-    print(output.size())
+# def deepemd(
+#         **kwargs
+# ):
+#     _model = DeepEMD(
+#         # args=kwargs['args'],
+#         **kwargs
+#     )
+#     return _model
+#
+#
+# if __name__ == '__main__':
+#     import torch
+#
+#     model = deepemd().cuda()
+#     data = torch.rand(10, 3, 84, 84).cuda()
+#     output = model(data)
+#     print(output.size())
