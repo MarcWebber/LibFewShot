@@ -193,6 +193,8 @@ class DeepEMD(MetaModel):
         proto = proto.permute(0, 1, 3, 2)
         query = query.permute(0, 1, 3, 2)
         feature_size = proto.shape[-2]
+        
+        print(self.args.get("metric"))
 
         if self.args.get("metric") == 'cosine':
             proto = proto.unsqueeze(-3)
