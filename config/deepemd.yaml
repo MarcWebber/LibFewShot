@@ -21,6 +21,7 @@ classifier:
     temperature_attn: 5.0
     mode: meta
     args:
+      norm: center
       way: 5
       shot: 1
       query: 15

@@ -13,6 +13,7 @@ class DeepEMD(MetaModel):
         super(DeepEMD, self).__init__(**kwargs)
 
         self.mode = mode
+        self.args = args
         # self.args = args
         self.encoder = ResNet()
         if self.mode == 'pre_train':
@@ -33,18 +34,26 @@ class DeepEMD(MetaModel):
     #     return output,acc
 
     def forward(self, _input):
+        
+        # print("mode",self.mode)
+        # print("args",self.args)
         # _input是一个list
         # 查看_input
         if self.mode == 'meta':
+            # TODO: support和quert是有问题的, support其实是train，query是test
+            # support和query同样维度，但size可以不同
+            
+            # print(len(_input))
+            # print(_input)
             support = _input[0]
-            query = _input[1]
+            query = _input[2]
             return self.emd_forward_1shot(support, query)
 
         elif self.mode == 'pre_train':
             return self.pre_train_forward(_input)
 
         elif self.mode == 'encoder':
-            if self.args.deepemd == 'fcn':
+            if self.args.get("deepemd") == 'fcn':
                 dense = True
             else:
                 dense = False
@@ -56,15 +65,27 @@ class DeepEMD(MetaModel):
         return self.fc(self.encode(_input, dense=False).squeeze(-1).squeeze(-1))
 
     def get_weight_vector(self, A, B):
+        
+        # M = 1
+        # N = 80
 
         M = A.shape[0]
         N = B.shape[0]
+        
+        # print("M",M)
+        # print("N",N)
+        
+        # print(A)
 
         B = F.adaptive_avg_pool2d(B, (1, 1))
         B = B.repeat(1, 1, A.shape[2], A.shape[3])
+        # print(B)
 
         A = A.unsqueeze(1)
         B = B.unsqueeze(0)
+        
+        # print(A)
+        # print(B)
 
         A = A.repeat(1, N, 1, 1, 1)
         B = B.repeat(M, 1, 1, 1, 1)
@@ -76,6 +97,9 @@ class DeepEMD(MetaModel):
 
     def emd_forward_1shot(self, proto, query):
         proto = proto.squeeze(0)
+        
+        # print(proto)
+        # print(query)
 
         weight_1 = self.get_weight_vector(query, proto)
         weight_2 = self.get_weight_vector(proto, query)
@@ -84,7 +108,7 @@ class DeepEMD(MetaModel):
         query = self.normalize_feature(query)
 
         similarity_map = self.get_similiarity_map(proto, query)
-        if self.args.solver == 'opencv' or (not self.training):
+        if self.args.get("solver") == 'opencv' or (not self.training):
             logits = self.get_emd_distance(similarity_map, weight_1, weight_2, solver='opencv')
         else:
             logits = self.get_emd_distance(similarity_map, weight_1, weight_2, solver='qpth')
@@ -93,20 +117,20 @@ class DeepEMD(MetaModel):
     def get_sfc(self, support):
         support = support.squeeze(0)
         # init the proto
-        SFC = support.view(self.args.shot, -1, 640, support.shape[-2], support.shape[-1]).mean(dim=0).clone().detach()
+        SFC = support.view(self.args.get("shot"), -1, 640, support.shape[-2], support.shape[-1]).mean(dim=0).clone().detach()
         SFC = nn.Parameter(SFC.detach(), requires_grad=True)
 
-        optimizer = torch.optim.SGD([SFC], lr=self.args.sfc_lr, momentum=0.9, dampening=0.9, weight_decay=0)
+        optimizer = torch.optim.SGD([SFC], lr=self.args.get("sfc_lr"), momentum=0.9, dampening=0.9, weight_decay=0)
 
         # crate label for finetune
-        label_shot = torch.arange(self.args.way).repeat(self.args.shot)
+        label_shot = torch.arange(self.args.get("way")).repeat(self.args.get("shot"))
         label_shot = label_shot.type(torch.cuda.LongTensor)
 
         with torch.enable_grad():
-            for k in range(0, self.args.sfc_update_step):
-                rand_id = torch.randperm(self.args.way * self.args.shot).cuda()
-                for j in range(0, self.args.way * self.args.shot, self.args.sfc_bs):
-                    selected_id = rand_id[j: min(j + self.args.sfc_bs, self.args.way * self.args.shot)]
+            for k in range(0, self.args.get("sfc_update_step")):
+                rand_id = torch.randperm(self.args.get("way") * self.args.get("shot")).cuda()
+                for j in range(0, self.args.get("way") *self.args.get("shot"), self.args.get("sfc_bs")):
+                    selected_id = rand_id[j: min(j + self.args.get("sfc_bs"), self.args.get("way") * self.args.get("shot"))]
                     batch_shot = support[selected_id, :]
                     batch_label = label_shot[selected_id]
                     optimizer.zero_grad()
@@ -129,7 +153,7 @@ class DeepEMD(MetaModel):
 
                     similarity_map[i, j, :, :] = (similarity_map[i, j, :, :]) * torch.from_numpy(flow).cuda()
 
-            temperature = (self.args.temperature / _num_node)
+            temperature = (self.args.get("temperature") / _num_node)
             logitis = similarity_map.sum(-1).sum(-1) * temperature
             return logitis
 
@@ -140,11 +164,11 @@ class DeepEMD(MetaModel):
             weight_1 = weight_1.view(num_query * num_proto, weight_1.shape[-1])
             weight_2 = weight_2.reshape(num_query * num_proto, weight_2.shape[-1])
 
-            _, flows = emd_inference_qpth(1 - similarity_map, weight_1, weight_2, form=self.args.form,
-                                          l2_strength=self.args.l2_strength)
+            _, flows = emd_inference_qpth(1 - similarity_map, weight_1, weight_2, form=self.args.get("form"),
+                                          l2_strength=self.args.get("l2_strength"))
 
             logitis = (flows * similarity_map).view(num_query, num_proto, flows.shape[-2], flows.shape[-1])
-            temperature = (self.args.temperature / _num_node)
+            temperature = (self.args.get("temperature") / _num_node)
             logitis = logitis.sum(-1).sum(-1) * temperature
         else:
             raise ValueError('Unknown Solver')
@@ -152,7 +176,7 @@ class DeepEMD(MetaModel):
         return logitis
 
     def normalize_feature(self, x):
-        if self.args.norm == 'center':
+        if self.args.get("norm") == 'center':
             x = x - x.mean(1).unsqueeze(1)
             return x
         else:
@@ -170,12 +194,12 @@ class DeepEMD(MetaModel):
         query = query.permute(0, 1, 3, 2)
         feature_size = proto.shape[-2]
 
-        if self.args.metric == 'cosine':
+        if self.args.get("metric") == 'cosine':
             proto = proto.unsqueeze(-3)
             query = query.unsqueeze(-2)
             query = query.repeat(1, 1, 1, feature_size, 1)
             similarity_map = F.cosine_similarity(proto, query, dim=-1)
-        if self.args.metric == 'l2':
+        if self.args.get("metric") == 'l2':
             proto = proto.unsqueeze(-3)
             query = query.unsqueeze(-2)
             query = query.repeat(1, 1, 1, feature_size, 1)
@@ -201,13 +225,13 @@ class DeepEMD(MetaModel):
             if not dense:
                 x = F.adaptive_avg_pool2d(x, 1)
                 return x
-            if self.args.feature_pyramid is not None:
+            if self.args.get("feature_pyramid") is not None:
                 x = self.build_feature_pyramid(x)
         return x
 
     def build_feature_pyramid(self, feature):
         feature_list = []
-        for size in self.args.feature_pyramid:
+        for size in self.args.get("feature_pyramid"):
             feature_list.append(F.adaptive_avg_pool2d(feature, size).view(feature.shape[0], feature.shape[1], 1, -1))
         feature_list.append(feature.view(feature.shape[0], feature.shape[1], 1, -1))
         out = torch.cat(feature_list, dim=-1)
