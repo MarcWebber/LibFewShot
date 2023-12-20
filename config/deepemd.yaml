@@ -76,7 +76,7 @@ optimizer:
 
 parallel_part:
   - emb_func
-pretrain_path: null
+pretrain_path: results/deepemd_pretrain_model/miniimagenet/resnet12/max_acc.pth
 
 # other parmas are listed below
 #     parser.add_argument('-way', type=int, default=5)

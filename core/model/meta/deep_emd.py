@@ -9,7 +9,7 @@ import torch.nn.functional as F
 class DeepEMD(MetaModel):
     # TODO: FIGURE OUT WHAT THIS ARG
     # def __init__(self, args, mode='meta'):
-    def __init__(self, mode, args,**kwargs):
+    def __init__(self, mode, args, **kwargs):
         super(DeepEMD, self).__init__(**kwargs)
 
         self.mode = mode
@@ -33,48 +33,56 @@ class DeepEMD(MetaModel):
     #     acc = accuracy(logits, query_target.contiguous().reshape(-1))
     #     return output,acc
 
-    def forward(self, _input):
-        
-        # print("mode",self.mode)
-        # print("args",self.args)
-        # _input是一个list
-        # 查看_input
-        if self.mode == 'meta':
-            # TODO: support和quert是有问题的, support其实是train，query是test
-            # support和query同样维度，但size可以不同
-            
-            # print(len(_input))
-            # print(_input)
-            support = _input[0]
-            query = _input[2]
-            return self.emd_forward_1shot(support, query)
-
-        elif self.mode == 'pre_train':
-            return self.pre_train_forward(_input)
-
-        elif self.mode == 'encoder':
-            if self.args.get("deepemd") == 'fcn':
-                dense = True
-            else:
-                dense = False
-            return self.encode(_input, dense)
+    def forward(self, batch):
+        if self.training:
+            return self.set_forward_loss(batch)
         else:
-            raise ValueError('Unknown mode')
+            return self.set_forward(batch)
+
+    def set_forward(self, batch):
+        image, global_target = batch  # unused global_target
+        image = image.to(self.device)
+        (
+            support_image,
+            query_image,
+            support_target,
+            query_target,
+        ) = self.split_by_episode(image, mode=1)
+        episode_size, _, c, h, w = support_image.size()
+
+        print("support_image", support_image.shape)
+
+        return self.emd_forward_1shot(support_image, query_image)
+
+    def set_forward_loss(self, batch):
+        image, global_target = batch  # unused global_target
+        image = image.to(self.device)
+        (
+            support_image,
+            query_image,
+            support_target,
+            query_target,
+        ) = self.split_by_episode(image, mode=1)
+        episode_size, _, c, h, w = support_image.size()
+
+        print("support_image", support_image.shape)
+
+        return self.emd_forward_1shot(support_image, query_image)
 
     def pre_train_forward(self, _input):
         return self.fc(self.encode(_input, dense=False).squeeze(-1).squeeze(-1))
 
     def get_weight_vector(self, A, B):
-        
+
         # M = 1
         # N = 80
 
         M = A.shape[0]
         N = B.shape[0]
-        
+
         # print("M",M)
         # print("N",N)
-        
+
         # print(A)
 
         B = F.adaptive_avg_pool2d(B, (1, 1))
@@ -83,7 +91,7 @@ class DeepEMD(MetaModel):
 
         A = A.unsqueeze(1)
         B = B.unsqueeze(0)
-        
+
         # print(A)
         # print(B)
 
@@ -97,7 +105,7 @@ class DeepEMD(MetaModel):
 
     def emd_forward_1shot(self, proto, query):
         proto = proto.squeeze(0)
-        
+
         # print(proto)
         # print(query)
 
@@ -117,7 +125,8 @@ class DeepEMD(MetaModel):
     def get_sfc(self, support):
         support = support.squeeze(0)
         # init the proto
-        SFC = support.view(self.args.get("shot"), -1, 640, support.shape[-2], support.shape[-1]).mean(dim=0).clone().detach()
+        SFC = support.view(self.args.get("shot"), -1, 640, support.shape[-2], support.shape[-1]).mean(
+            dim=0).clone().detach()
         SFC = nn.Parameter(SFC.detach(), requires_grad=True)
 
         optimizer = torch.optim.SGD([SFC], lr=self.args.get("sfc_lr"), momentum=0.9, dampening=0.9, weight_decay=0)
@@ -129,8 +138,9 @@ class DeepEMD(MetaModel):
         with torch.enable_grad():
             for k in range(0, self.args.get("sfc_update_step")):
                 rand_id = torch.randperm(self.args.get("way") * self.args.get("shot")).cuda()
-                for j in range(0, self.args.get("way") *self.args.get("shot"), self.args.get("sfc_bs")):
-                    selected_id = rand_id[j: min(j + self.args.get("sfc_bs"), self.args.get("way") * self.args.get("shot"))]
+                for j in range(0, self.args.get("way") * self.args.get("shot"), self.args.get("sfc_bs")):
+                    selected_id = rand_id[
+                                  j: min(j + self.args.get("sfc_bs"), self.args.get("way") * self.args.get("shot"))]
                     batch_shot = support[selected_id, :]
                     batch_label = label_shot[selected_id]
                     optimizer.zero_grad()
@@ -193,7 +203,7 @@ class DeepEMD(MetaModel):
         proto = proto.permute(0, 1, 3, 2)
         query = query.permute(0, 1, 3, 2)
         feature_size = proto.shape[-2]
-        
+
         print(self.args.get("metric"))
 
         if self.args.get("metric") == 'cosine':
