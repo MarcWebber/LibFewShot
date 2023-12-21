@@ -5,6 +5,14 @@ from core.model.backbone.utils.deep_emd import emd_inference_opencv, emd_inferen
 from core.model.backbone.resnet_12 import ResNet
 import torch.nn.functional as F
 
+# def count_acc(logits, label):
+    # pred = torch.argmax(logits, dim=1)
+    # if torch.cuda.is_available():
+    #     return (pred == label).type(torch.cuda.FloatTensor).mean().item()
+    # else:
+    #     return (pred == label).type(torch.FloatTensor).mean().item()
+    
+# acc = count_acc(logits,label)
 
 class DeepEMD(MetaModel):
     # TODO: FIGURE OUT WHAT THIS ARG
@@ -14,6 +22,7 @@ class DeepEMD(MetaModel):
 
         self.mode = mode
         self.args = args
+        self.loss_func = nn.CrossEntropyLoss()
         # self.args = args
         self.encoder = ResNet()
         if self.mode == 'pre_train':
@@ -38,6 +47,7 @@ class DeepEMD(MetaModel):
             return self.set_forward_loss(batch)
         else:
             return self.set_forward(batch)
+        
 
     def set_forward(self, batch):
         image, global_target = batch  # unused global_target
@@ -48,6 +58,8 @@ class DeepEMD(MetaModel):
             support_target,
             query_target,
         ) = self.split_by_episode(image, mode=1)
+        
+        
         episode_size, _, c, h, w = support_image.size()
 
         print("support_image", support_image.shape)
@@ -55,19 +67,82 @@ class DeepEMD(MetaModel):
         return self.emd_forward_1shot(support_image, query_image)
 
     def set_forward_loss(self, batch):
-        image, global_target = batch  # unused global_target
-        image = image.to(self.device)
-        (
-            support_image,
+        image=batch
+        # image, global_target = (batch,0)  # unused global_target
+        # print("image 0",image[0])
+        # print("image 1",image[1])
+        # print("image 2",image[2])
+        # print("image 3",image[3])
+        
+        
+        # image = image.to(self.device)
+        # (
+        #     support_image,
+        #     query_image,
+        #     support_target,
+        #     query_target,
+        # ) = self.split_by_episode(image, mode=1)
+        
+        (  support_image,
             query_image,
             support_target,
             query_target,
-        ) = self.split_by_episode(image, mode=1)
-        episode_size, _, c, h, w = support_image.size()
+        ) = (image[0],
+             image[2],
+             image[1],
+             image[3],)
+        
+        support_image=support_image.to(self.device)
+        support_target=support_target.to(self.device)
+        query_image=query_image.to(self.device)
+        query_target=query_target.to(self.device)
+            
+        episode_size, c, h, w = support_image.size()
+        
+        output_list = []
+        
+        for i in range(episode_size):
+            # episode_support_image = support_image[i].contiguous().reshape(-1, c, h, w)
+            # episode_query_image = query_image[i].contiguous().reshape(-1, c, h, w)
+            # episode_support_target = support_target[i].reshape(-1)
+            # episode_query_targets = query_targets[i].reshape(-1)
+            
+            print(support_image[i].size())
+            print(query_image[i].size())
+            
+            # correct till here
+            self.set_forward_adaptation(support_image[i], query_image[i])
 
-        print("support_image", support_image.shape)
+            output = self.forward_output(episode_query_image)
 
-        return self.emd_forward_1shot(support_image, query_image)
+            output_list.append(output)
+
+        output = torch.cat(output_list, dim=0)
+        loss = self.loss_func(output, query_target.contiguous().view(-1))
+        acc = accuracy(output, query_target.contiguous().view(-1))
+        return output, acc, loss
+
+    
+    # FIXME: BUG HERE
+    
+    def set_forward_adaptation(self,proto,query):
+        
+
+        # print(proto)
+        # print(query)
+
+        weight_1 = self.get_weight_vector(query, proto)
+        weight_2 = self.get_weight_vector(proto, query)
+
+        proto = self.normalize_feature(proto)
+        query = self.normalize_feature(query)
+
+        similarity_map = self.get_similiarity_map(proto, query)
+        if self.args.get("solver") == 'opencv' or (not self.training):
+            logits = self.get_emd_distance(similarity_map, weight_1, weight_2, solver='opencv')
+        else:
+            logits = self.get_emd_distance(similarity_map, weight_1, weight_2, solver='qpth')
+        return logits
 
     def pre_train_forward(self, _input):
         return self.fc(self.encode(_input, dense=False).squeeze(-1).squeeze(-1))
