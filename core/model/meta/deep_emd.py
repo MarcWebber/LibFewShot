@@ -45,6 +45,9 @@ class DeepEMD(MetaModel):
     #     acc = accuracy(logits, query_target.contiguous().reshape(-1))
     #     return output,acc
 
+    def forward_output(self, x):
+        pass
+
     def forward(self, batch):
         if self.training:
             return self.set_forward_loss(batch)
@@ -75,13 +78,13 @@ class DeepEMD(MetaModel):
         # print("image 2",image[2])
         # print("image 3",image[3])
 
+        # print(type(batch))
         # image = image.to(self.device)
-        # (
-        #     support_image,
-        #     query_image,
-        #     support_target,
-        #     query_target,
-        # ) = self.split_by_episode(image, mode=1)
+        # (support_image,
+        #  query_image,
+        #  support_target,
+        #  query_target,
+        # ) = self.split_by_episode(image, mode=2)
 
         (support_image,
          query_image,
@@ -92,6 +95,8 @@ class DeepEMD(MetaModel):
               image[1],
               image[3],)
 
+        #  support torch.Size([80, 3, 84, 84])
+        #  query  torch.Size([128, 3, 84, 84])
         support_image = support_image.to(self.device)
         support_target = support_target.to(self.device)
         query_image = query_image.to(self.device)
@@ -101,17 +106,20 @@ class DeepEMD(MetaModel):
 
         output_list = []
 
-        for i in range(episode_size):
-            # episode_support_image = support_image[i].contiguous().reshape(-1, c, h, w)
-            # episode_query_image = query_image[i].contiguous().reshape(-1, c, h, w)
-            # episode_support_target = support_target[i].reshape(-1)
-            # episode_query_targets = query_targets[i].reshape(-1)
+        print(episode_size)
 
-            print(support_image[i].size())
-            print(query_image[i].size())
+        # FIXME: 这里肯定有问题，单先跑起来再看
+        for i in range(episode_size):
+            episode_support_image = support_image[i:i + 1]
+            episode_query_image = query_image[i:i + 1]
+            episode_support_target = support_target[i:i + 1]
+            episode_query_target = query_target[i:i + 1]
+
+            # print(support_image[i].size())
+            # print(query_image[i].size())
 
             # correct till here
-            self.set_forward_adaptation(support_image[i], query_image[i])
+            self.set_forward_adaptation(episode_support_image, episode_query_image)
 
             output = self.forward_output(episode_query_image)
 
@@ -124,11 +132,11 @@ class DeepEMD(MetaModel):
 
     # FIXME: BUG HERE
 
-
     '''
     :usage 用于两张图得计算距离
     :return: logits距离
     '''
+
     def set_forward_adaptation(self, proto, query):
 
         # print(proto)
@@ -155,11 +163,13 @@ class DeepEMD(MetaModel):
         # M = 1
         # N = 80
 
+        print(A.shape)
+
+        # print("A",A)
+        # print("B",B)
+
         M = A.shape[0]
         N = B.shape[0]
-
-        print("M",M)
-        print("N",N)
 
         # print(A)
 
@@ -180,7 +190,6 @@ class DeepEMD(MetaModel):
         combination = combination.view(M, N, -1)
         combination = F.relu(combination) + 1e-3
         return combination
-
 
     # 用于两张图得计算距离,logits是距离
     # def emd_forward_1shot(self, proto, query):
@@ -231,6 +240,8 @@ class DeepEMD(MetaModel):
         return SFC
 
     def get_emd_distance(self, similarity_map, weight_1, weight_2, solver='opencv'):
+
+        print("get_emd_distance")
         num_query = similarity_map.shape[0]
         num_proto = similarity_map.shape[1]
         _num_node = weight_1.shape[-1]
@@ -273,24 +284,54 @@ class DeepEMD(MetaModel):
             return x
 
     def get_similiarity_map(self, proto, query):
+
+        # print(type(proto))
+        # print(type(query))
+
+        # TODO : SERVER BUG HERE
+        print(proto.shape)
+        print(query.shape)
+
+        # TODO: 我这里强行调整了张良维度，肯定是不对的
+        proto = proto[1:2]
+        query = query[1:2]
         way = proto.shape[0]
         num_query = query.shape[0]
+
         query = query.view(query.shape[0], query.shape[1], -1)
         proto = proto.view(proto.shape[0], proto.shape[1], -1)
 
-        proto = proto.unsqueeze(0).repeat([num_query, 1, 1, 1])
-        query = query.unsqueeze(1).repeat([1, way, 1, 1])
+        # 这里的作用是专为同一维度
+        # query = query.view(query.shape[0], query.shape[1], -1)
+        # proto = proto.view(proto.shape[0], proto.shape[1], -1)
+        print("round 2")
+        print(query.shape)
+        print(proto.shape)
+
+        # TODO :即使是1WAY 1SHOT为啥都会有问题
+
+        proto = proto.unsqueeze(0).repeat([1, 1, 1, 1])
+        query = query.unsqueeze(1).repeat([1, 1, 1, 1])
+
+        # proto = proto.unsqueeze(0).repeat([num_query, 1, 1, 1])
+        # query = query.unsqueeze(1).repeat([1, way, 1, 1])
+
+        print("round 3")
+
+        print(query.shape)
+        print(proto.shape)
         proto = proto.permute(0, 1, 3, 2)
         query = query.permute(0, 1, 3, 2)
         feature_size = proto.shape[-2]
 
-        print(self.args.get("metric"))
-
         if self.args.get("metric") == 'cosine':
             proto = proto.unsqueeze(-3)
             query = query.unsqueeze(-2)
+
+            print("feature_size", feature_size)
             query = query.repeat(1, 1, 1, feature_size, 1)
             similarity_map = F.cosine_similarity(proto, query, dim=-1)
+
         if self.args.get("metric") == 'l2':
             proto = proto.unsqueeze(-3)
             query = query.unsqueeze(-2)
@@ -298,6 +339,7 @@ class DeepEMD(MetaModel):
             similarity_map = (proto - query).pow(2).sum(-1)
             similarity_map = 1 - similarity_map
 
+        print(similarity_map)
         return similarity_map
 
     def encode(self, x, dense=True):
