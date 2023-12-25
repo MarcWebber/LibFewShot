@@ -57,6 +57,7 @@ class AbstractModel(nn.Module):
         split features by episode and
         generate local targets + split labels by episode
         """
+
         episode_size = features.size(0) // (
             self.way_num * (self.shot_num + self.query_num)
         )
