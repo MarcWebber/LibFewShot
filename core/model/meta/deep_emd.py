@@ -50,6 +50,7 @@ class DeepEMD(MetaModel):
         return 1
         # return torch.argmax(logits, dim=1)
 
+
     def forward(self, batch):
         if self.training:
             return self.set_forward_loss(batch)
@@ -80,7 +81,9 @@ class DeepEMD(MetaModel):
         # # print("image 2",image[2])
         # # print("image 3",image[3])
 
+
         # # print(type(batch))
+
         # image = image.to(self.device)
         # (support_image,
         #  query_image,
@@ -109,6 +112,7 @@ class DeepEMD(MetaModel):
 
         output_list = []
 
+
         # print(episode_size)
 
         #         for i in range(episode_size):
@@ -124,6 +128,7 @@ class DeepEMD(MetaModel):
         logits=self.set_forward_adaptation(support_image, query_image)
 
         # outputing
+
 
         # print("outputting-----------")
 
@@ -142,11 +147,11 @@ class DeepEMD(MetaModel):
 
     # FIXME: BUG HERE
 
-
     '''
     :usage 用于两张图得计算距离
     :return: logits距离
     '''
+
     def set_forward_adaptation(self, proto, query):
 
         # # print(proto)
@@ -175,11 +180,13 @@ class DeepEMD(MetaModel):
         # M = 1
         # N = 80
 
+
         # print(A.shape)
 
 
         # # print("A",A)
         # # print("B",B)
+
 
         M = A.shape[0]
         N = B.shape[0]
@@ -187,6 +194,7 @@ class DeepEMD(MetaModel):
 
 
         # # print(A)
+
 
         B = F.adaptive_avg_pool2d(B, (1, 1))
         B = B.repeat(1, 1, A.shape[2], A.shape[3])
@@ -205,7 +213,6 @@ class DeepEMD(MetaModel):
         combination = combination.view(M, N, -1)
         combination = F.relu(combination) + 1e-3
         return combination
-
 
     # 用于两张图得计算距离,logits是距离
     # def emd_forward_1shot(self, proto, query):
@@ -257,7 +264,9 @@ class DeepEMD(MetaModel):
 
     def get_emd_distance(self, similarity_map, weight_1, weight_2, solver='opencv'):
 
+
         # print("getting emd distance")
+
         num_query = similarity_map.shape[0]
         num_proto = similarity_map.shape[1]
         _num_node = weight_1.shape[-1]
@@ -319,12 +328,14 @@ class DeepEMD(MetaModel):
     def get_similiarity_map(self, proto, query):
 
 
+
         # # print(type(proto))
         # # print(type(query))
 
         # TODO : SERVER BUG HERE
         # print(proto.shape)
         # print(query.shape)
+
 
         # TODO: 我这里强行调整了张良维度，肯定是不对的
         proto = proto[1:2]
@@ -336,12 +347,14 @@ class DeepEMD(MetaModel):
         proto = proto.view(proto.shape[0], proto.shape[1], -1)
 
 
+
         # 这里的作用是专为同一维度
         # query = query.view(query.shape[0], query.shape[1], -1)
         # proto = proto.view(proto.shape[0], proto.shape[1], -1)
         # print("round 2")
         # print(query.shape)
         # print(proto.shape)
+
 
         # TODO :即使是1WAY 1SHOT为啥都会有问题
 
@@ -351,10 +364,12 @@ class DeepEMD(MetaModel):
         # proto = proto.unsqueeze(0).repeat([num_query, 1, 1, 1])
         # query = query.unsqueeze(1).repeat([1, way, 1, 1])
 
+
         # print("round 3")
 
         # print(query.shape)
         # print(proto.shape)
+
         proto = proto.permute(0, 1, 3, 2)
         query = query.permute(0, 1, 3, 2)
         feature_size = proto.shape[-2]
@@ -365,9 +380,12 @@ class DeepEMD(MetaModel):
             proto = proto.unsqueeze(-3)
             query = query.unsqueeze(-2)
 
+
             # print("feature_size",feature_size)
             query = query.repeat(1, 1, 1, feature_size, 1)
             similarity_map = F.cosine_similarity(proto, query, dim=-1)
+
+
 
 
         if self.args.get("metric") == 'l2':
@@ -379,6 +397,7 @@ class DeepEMD(MetaModel):
 
 
         # print(similarity_map)
+
         return similarity_map
 
     def encode(self, x, dense=True):
