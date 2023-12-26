@@ -17,14 +17,19 @@ def emd_inference_qpth(distance_matrix, weight1, weight2, form='QP', l2_strength
     flow : nbatch * weight_number *weight_number
 
     """
-
+    print('form:', form)
     weight1 = (weight1 * weight1.shape[-1]) / weight1.sum(1).unsqueeze(1)
     weight2 = (weight2 * weight2.shape[-1]) / weight2.sum(1).unsqueeze(1)
+
+    print('weight1:', weight1)
+    print('weight2:', weight2)
 
     nbatch = distance_matrix.shape[0]
     nelement_distmatrix = distance_matrix.shape[1] * distance_matrix.shape[2]
     nelement_weight1 = weight1.shape[1]
     nelement_weight2 = weight2.shape[1]
+
+    print('nbatch:', nbatch)
 
     Q_1 = distance_matrix.view(-1, 1, nelement_distmatrix).double()
 
