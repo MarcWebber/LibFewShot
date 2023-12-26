@@ -12,7 +12,7 @@ episode_size: 2
 train_episode: 2000
 test_episode: 600
 
-device_ids: 5
+device_ids: 0
 n_gpu: 1
 epoch: 100
 
@@ -40,7 +40,7 @@ classifier:
       test_iter: 10
     feat_dim: 1600
 
-
+data_root: ./data/fewshot/miniImageNet--ravi
 # backbone:
 #   name: resnet12
 #   kwargs: ~
