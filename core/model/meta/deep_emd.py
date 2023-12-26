@@ -149,7 +149,7 @@ class DeepEMD(MetaModel):
 
     '''
     :usage 用于两张图得计算距离
-    :return: logits距离
+    :return: logitis距离
     '''
 
     def set_forward_adaptation(self, proto, query):
@@ -234,18 +234,13 @@ class DeepEMD(MetaModel):
         if solver == 'opencv':  # use openCV solver
 
             # FIXME: SHOULD UES THE COMMENTED LINES
-            # for i in range(num_query):
-            #     for j in range(num_proto):
-            # print("similarity map",similarity_map[0, 0, :, :])
-
             for i in range(1):
                 for j in range(1):
                     # FIXME: 这里的代码注释掉了，但是不注释掉直接死在这里了
-                    # print("opencv solver running")
-                    # _, flow = emd_inference_opencv(1 - similarity_map[i, j, :, :], weight_1[i, j, :], weight_2[j, i, :])
-                    # # print("flow",flow)
-                    # similarity_map[i, j, :, :] = (similarity_map[i, j, :, :]) * torch.from_numpy(flow).cuda()
-                    pass
+                    print("opencv solver running")
+                    _, flow = emd_inference_opencv(1 - similarity_map[i, j, :, :], weight_1[i, j, :], weight_2[j, i, :])
+                    print("flow",flow)
+                    similarity_map[i, j, :, :] = (similarity_map[i, j, :, :]) * torch.from_numpy(flow).cuda()
 
             # print("opencv solver finished")
             temperature = (self.args.get("temperature") / _num_node)
@@ -316,7 +311,6 @@ class DeepEMD(MetaModel):
             similarity_map = (proto - query).pow(2).sum(-1)
             similarity_map = 1 - similarity_map
 
-        # print(similarity_map)
 
         return similarity_map
 
