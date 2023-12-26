@@ -17,12 +17,12 @@ def emd_inference_qpth(distance_matrix, weight1, weight2, form='QP', l2_strength
     flow : nbatch * weight_number *weight_number
 
     """
-    print('form:', form)
+    # print('form:', form)
     weight1 = (weight1 * weight1.shape[-1]) / weight1.sum(1).unsqueeze(1)
     weight2 = (weight2 * weight2.shape[-1]) / weight2.sum(1).unsqueeze(1)
 
-    print('weight1:', weight1)
-    print('weight2:', weight2)
+    # print('weight1:', weight1)
+    # print('weight2:', weight2)
 
     nbatch = distance_matrix.shape[0]
     nelement_distmatrix = distance_matrix.shape[1] * distance_matrix.shape[2]
@@ -69,15 +69,24 @@ def emd_inference_qpth(distance_matrix, weight1, weight2, form='QP', l2_strength
 
 def emd_inference_opencv(cost_matrix, weight1, weight2):
     # cost matrix is a tensor of shape [N,N]
+    print('cost_matrix:', cost_matrix.shape)
     cost_matrix = cost_matrix.detach().cpu().numpy()
+    # print("cost_matrix",cost_matrix)
 
     weight1 = F.relu(weight1) + 1e-5
     weight2 = F.relu(weight2) + 1e-5
 
+    # print('weight1:', weight1.shape)
+    # print('weight2:', weight2.shape)
+
     weight1 = (weight1 * (weight1.shape[0] / weight1.sum().item())).view(-1, 1).detach().cpu().numpy()
     weight2 = (weight2 * (weight2.shape[0] / weight2.sum().item())).view(-1, 1).detach().cpu().numpy()
 
+    # print('weight1:', weight1.shape)
+    # print('weight2:', weight2.shape)
+
     cost, _, flow = cv2.EMD(weight1, weight2, cv2.DIST_USER, cost_matrix)
+    # print("cost",cost,"flow",flow)
     return cost, flow
 
 
