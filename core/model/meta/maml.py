@@ -51,6 +51,8 @@ class MAML(MetaModel):
         return out2
 
     def set_forward(self, batch):
+
+        print(batch.shape)
         image, global_target = batch  # unused global_target
         image = image.to(self.device)
         (
@@ -59,6 +61,11 @@ class MAML(MetaModel):
             support_target,
             query_target,
         ) = self.split_by_episode(image, mode=2)
+
+        print(support_image.shape)
+        print(query_image.shape)
+        print(support_target.shape)
+        print(query_target.shape)
         episode_size, _, c, h, w = support_image.size()
 
         output_list = []
@@ -78,14 +85,22 @@ class MAML(MetaModel):
         return output, acc
 
     def set_forward_loss(self, batch):
+        
         image, global_target = batch  # unused global_target
+        print(type(image))
         image = image.to(self.device)
+        print(image.shape)
         (
             support_image,
             query_image,
             support_target,
             query_target,
         ) = self.split_by_episode(image, mode=2)
+
+        print(support_image.shape)
+        print(query_image.shape)
+        print(support_target.shape)
+        print(query_target.shape)
         episode_size, _, c, h, w = support_image.size()
 
         output_list = []
@@ -114,9 +129,9 @@ class MAML(MetaModel):
         self.emb_func.train()
         self.classifier.train()
         for i in range(
-            self.inner_param["train_iter"]
-            if self.training
-            else self.inner_param["test_iter"]
+                self.inner_param["train_iter"]
+                if self.training
+                else self.inner_param["test_iter"]
         ):
             output = self.forward_output(support_set)
             loss = self.loss_func(output, support_target)

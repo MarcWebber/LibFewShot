@@ -2,15 +2,14 @@ augment: true
 augment_method: null
 augment_times: 1
 augment_times_query: 1
-#backbone:
-#  kwargs:
-#    is_feature: false
-#    is_flatten: false
-#    last_pool: true
-#    leaky_relu: false
-#    maxpool_last2: true
-#    negative_slope: 0.2
-#  name: Conv64F
+way_num: 5
+shot_num: 1
+query_num: 15
+episode_size: 2
+train_episode: 2000
+test_episode: 600
+
+ 
 batch_size: 128
 classifier:
   kwargs:
@@ -36,6 +35,8 @@ classifier:
       l2_strength: 0.000001
 
   name: DeepEMD
+  
+  
 data_root: ./data/fewshot/miniImageNet--ravi
 deterministic: true
 device_ids: 0

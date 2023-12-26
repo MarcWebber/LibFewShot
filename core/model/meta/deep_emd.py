@@ -18,32 +18,18 @@ from ...utils import accuracy
 # acc = count_acc(logits,label)
 
 class DeepEMD(MetaModel):
-    # TODO: FIGURE OUT WHAT THIS ARG
-    # def __init__(self, args, mode='meta'):
+
     def __init__(self, mode, args, **kwargs):
         super(DeepEMD, self).__init__(**kwargs)
 
         self.mode = mode
         self.args = args
         self.loss_func = nn.CrossEntropyLoss()
-        # self.args = args
         self.encoder = ResNet()
         if self.mode == 'pre_train':
             self.fc = nn.Linear(640, self.args.num_class)
 
-    # def set_forward(self, batch):
-    #     image, global_target = batch
-    #     image = image.to(self.device)
-    #     # global_target = global_target.to(self.device)
-    #     # with torch.no_grad():
-    #     #     feat = self.emb_func(image)
-    #     # support_feat, query_feat, support_target, query_target = self.split_by_episode(
-    #     #     feat, mode=1
-    #     # )
-    #     # episode_size = support_feat.size(0)
-    #     # logits = self.emd_forward_1shot(support_feat, query_feat)
-    #     acc = accuracy(logits, query_target.contiguous().reshape(-1))
-    #     return output,acc
+
 
     def forward_output(self, logits):
         # FIXME:
@@ -58,47 +44,28 @@ class DeepEMD(MetaModel):
             return self.set_forward(batch)
 
     def set_forward(self, batch):
-        image, global_target = batch  # unused global_target
-        image = image.to(self.device)
-        (
-            support_image,
-            query_image,
-            support_target,
-            query_target,
-        ) = self.split_by_episode(image, mode=1)
-
-        episode_size, _, c, h, w = support_image.size()
-
-        # print("support_image", support_image.shape)
-
-        return self.emd_forward_1shot(support_image, query_image)
-
-    def set_forward_loss(self, batch):
         image = batch
-        # image, global_target = (batch,0)  # unused global_target
-        # # print("image 0",image[0])
-        # # print("image 1",image[1])
-        # # print("image 2",image[2])
-        # # print("image 3",image[3])
-
-
-        # # print(type(batch))
-
-        # image = image.to(self.device)
+    
+        # FIXME: UNUSED CODE，为什么我只用image[0]就可以了？这个显然是不对的啊，那我后面的128size的是个什么东西？
         # (support_image,
         #  query_image,
         #  support_target,
         #  query_target,
-        # ) = self.split_by_episode(image, mode=2)
-
+        #  ) = (image[0],
+        #       image[2],
+        #       image[1],
+        #       image[3],)
+        
         (support_image,
          query_image,
          support_target,
          query_target,
-         ) = (image[0],
-              image[2],
-              image[1],
-              image[3],)
+         ) = self.split_by_episode(image[0],mode=2)
+        
+        print(support_image.shape)
+        print(query_image.shape)
+        print(support_target.shape)
+        print(query_image.shape)
 
         #  support torch.Size([80, 3, 84, 84])
         #  query  torch.Size([128, 3, 84, 84])
@@ -107,7 +74,7 @@ class DeepEMD(MetaModel):
         query_image = query_image.to(self.device)
         query_target = query_target.to(self.device)
 
-        episode_size, c, h, w = support_image.size()
+        episode_size, _,c, h, w = support_image.size()
 
 
         output_list = []
@@ -115,24 +82,79 @@ class DeepEMD(MetaModel):
 
         # print(episode_size)
 
-        #         for i in range(episode_size):
-        #             # episode_support_image = support_image[i].contiguous().reshape(-1, c, h, w)
-        #             # episode_query_image = query_image[i].contiguous().reshape(-1, c, h, w)
-        #             # episode_support_target = support_target[i].reshape(-1)
-        #             # episode_query_targets = query_targets[i].reshape(-1)
-
-        #             # # print(support_image[i].size())
-        #             # # print(query_image[i].size())
-
-        # correct till here
-        logits=self.set_forward_adaptation(support_image, query_image)
-
-        # outputing
+        for i in range(episode_size):
+            episode_support_image = support_image[i].contiguous().reshape(-1, c, h, w)
+            episode_query_image = query_image[i].contiguous().reshape(-1, c, h, w)
+            episode_support_target = support_target[i].reshape(-1)
+            episode_query_targets = query_target[i].reshape(-1)
+            
+            
 
 
-        # print("outputting-----------")
+            logits=self.set_forward_adaptation(episode_support_image, episode_query_image)
+            output = self.forward_output(logits)
 
-        output = self.forward_output(logits)
+
+        # FIXME: OUTPUT应该怎么计算？
+        # output_list.append(output)
+        # output = torch.cat(output_list, dim=0)
+        # TODO: LOSS的计算在哪里？
+        # FIXME
+        acc = 1
+        # acc = accuracy(output, query_target.contiguous().view(-1))
+        return output, acc
+    
+    
+    def set_forward_loss(self, batch):
+        image = batch
+    
+        # FIXME: UNUSED CODE，为什么我只用image[0]就可以了？这个显然是不对的啊，那我后面的128size的是个什么东西？
+        # (support_image,
+        #  query_image,
+        #  support_target,
+        #  query_target,
+        #  ) = (image[0],
+        #       image[2],
+        #       image[1],
+        #       image[3],)
+        
+        (support_image,
+         query_image,
+         support_target,
+         query_target,
+         ) = self.split_by_episode(image[0],mode=2)
+        
+        # print(support_image.shape)
+        # print(query_image.shape)
+        # print(support_target.shape)
+        # print(query_image.shape)
+
+        #  support torch.Size([80, 3, 84, 84])
+        #  query  torch.Size([128, 3, 84, 84])
+        support_image = support_image.to(self.device)
+        support_target = support_target.to(self.device)
+        query_image = query_image.to(self.device)
+        query_target = query_target.to(self.device)
+
+        episode_size, _,c, h, w = support_image.size()
+
+
+        output_list = []
+
+
+        # print(episode_size)
+
+        for i in range(episode_size):
+            episode_support_image = support_image[i].contiguous().reshape(-1, c, h, w)
+            episode_query_image = query_image[i].contiguous().reshape(-1, c, h, w)
+            episode_support_target = support_target[i].reshape(-1)
+            episode_query_targets = query_target[i].reshape(-1)
+            
+            
+
+
+            logits=self.set_forward_adaptation(episode_support_image, episode_query_image)
+            output = self.forward_output(logits)
 
 
         # FIXME: OUTPUT应该怎么计算？
@@ -153,9 +175,6 @@ class DeepEMD(MetaModel):
     '''
 
     def set_forward_adaptation(self, proto, query):
-
-        # # print(proto)
-        # # print(query)
 
         weight_1 = self.get_weight_vector(query, proto)
         weight_2 = self.get_weight_vector(proto, query)
@@ -180,31 +199,14 @@ class DeepEMD(MetaModel):
         # M = 1
         # N = 80
 
-
-        # print(A.shape)
-
-
-        # # print("A",A)
-        # # print("B",B)
-
-
         M = A.shape[0]
         N = B.shape[0]
 
-
-
-        # # print(A)
-
-
-        B = F.adaptive_avg_pool2d(B, (1, 1))
+        B = F.adaptive_avg_pool2d(B, [1, 1])
         B = B.repeat(1, 1, A.shape[2], A.shape[3])
-        # # print(B)
 
         A = A.unsqueeze(1)
         B = B.unsqueeze(0)
-
-        # # print(A)
-        # # print(B)
 
         A = A.repeat(1, N, 1, 1, 1)
         B = B.repeat(M, 1, 1, 1, 1)
