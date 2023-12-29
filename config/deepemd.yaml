@@ -4,7 +4,7 @@ augment_times: 1
 augment_times_query: 1
 way_num: 1
 shot_num: 1
-query_num: 2
+query_num: 1
 episode_size: 1
 batch_size: 128
 classifier:
