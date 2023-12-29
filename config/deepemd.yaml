@@ -9,9 +9,9 @@ episode_size: 1
 batch_size: 128
 classifier:
   kwargs:
-    feat_dim: 64
+    feat_dim: 640
     lambda_epi: 0.25
-    num_classes: 200
+    num_classes: 64
     temperature: 0.2
     temperature_attn: 5.0
     mode: meta
@@ -45,7 +45,7 @@ includes:
   - headers/model.yaml
   - headers/optimizer.yaml
   - classifiers/DeepEMD.yaml
-  - backbones/resnet12.yaml
+  - backbones/resnet12_emd.yaml
 log_interval: 100
 log_level: info
 log_name: null
@@ -73,39 +73,6 @@ optimizer:
 parallel_part:
   - emb_func
 pretrain_path: results/deepemd_pretrain_model/miniimagenet/resnet12/max_acc.pth
-
-# other parmas are listed below
-#     parser.add_argument('-way', type=int, default=5)
-#    parser.add_argument('-shot', type=int, default=1)
-#    parser.add_argument('-query', type=int, default=15)  # number of query image per class
-#    parser.add_argument('-dataset', type=str, default='miniimagenet', choices=['miniimagenet', 'cub','tieredimagenet','fc100','tieredimagenet_yao','cifar_fs'])
-#    parser.add_argument('-set', type=str, default='test', choices=['train','val', 'test'])
-#    # about model
-#    parser.add_argument('-temperature', type=float, default=12.5)
-#    parser.add_argument('-metric', type=str, default='cosine', choices=[ 'cosine' ])
-#    parser.add_argument('-norm', type=str, default='center', choices=[ 'center'])
-#    parser.add_argument('-deepemd', type=str, default='fcn', choices=['fcn', 'grid', 'sampling'])
-#    #deepemd fcn only
-#    parser.add_argument('-feature_pyramid', type=str, default=None)
-#    #deepemd sampling only
-#    parser.add_argument('-num_patch',type=int,default=9)
-#    #deepemd grid only patch_list
-#    parser.add_argument('-patch_list',type=str,default='2,3')
-#    parser.add_argument('-patch_ratio',type=float,default=2)
-#    # solver
-#    parser.add_argument('-solver', type=str, default='opencv', choices=['opencv'])
-#    # SFC
-#    parser.add_argument('-sfc_lr', type=float, default=100)
-#    parser.add_argument('-sfc_wd', type=float, default=0, help='weight decay for SFC weight')
-#    parser.add_argument('-sfc_update_step', type=float, default=100)
-#    parser.add_argument('-sfc_bs', type=int, default=4)
-#    # others
-#    parser.add_argument('-test_episode', type=int, default=5000)
-#    parser.add_argument('-gpu', default='0,1')
-#    parser.add_argument('-data_dir', type=str, default=DATA_DIR)
-#    parser.add_argument('-model_dir', type=str, default=MODEL_DIR)
-#    parser.add_argument('-seed', type=int, default=1)
-
 
 result_root: ./results
 resume: false

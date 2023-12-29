@@ -316,3 +316,5 @@ if __name__ == "__main__":
     data = torch.rand(10, 3, 84, 84).cuda()
     output = model(data)
     print(output.size())
+
+    

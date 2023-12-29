@@ -90,9 +90,7 @@ class DeepEMD(MetaModel):
         return output, acc
 
     def set_forward_loss(self, batch):
-        print(type(batch))
-        print(batch)
-        image, global_target = batch[0], batch[3]
+        image = batch
 
         # FIXME: UNUSED CODE，为什么我只用image[0]就可以了？这个显然是不对的啊，那我后面的128size的是个什么东西？
         # 这里怎么说进来的batch都应该是一个tensor而不是list啊，怎么回事
@@ -109,7 +107,7 @@ class DeepEMD(MetaModel):
          query_image,
          support_target,
          query_target,
-         ) = self.split_by_episode(image, mode=2)
+         ) = self.split_by_episode(image[0], mode=2)
 
         print(support_image.shape)
         print(query_image.shape)
