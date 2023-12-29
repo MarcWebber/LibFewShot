@@ -17,9 +17,9 @@ classifier:
     mode: meta
     args:
       norm: center
-      way: 1
+      way: 5
       shot: 1
-      query: 15
+      query: 1
       deepemd: fcn
       solver: opencv
       num_patch: 9

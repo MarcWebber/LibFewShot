@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from .meta_model import MetaModel
 from core.model.backbone.utils.deep_emd import emd_inference_opencv, emd_inference_qpth
-from core.model.backbone.resnet_12 import ResNet
+from core.model.backbone.resnet_12_emd import ResNet
 import torch.nn.functional as F
 
 from ...utils import accuracy
