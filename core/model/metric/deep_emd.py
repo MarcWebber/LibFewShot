@@ -245,16 +245,10 @@ class DeepEMD(MetricModel):
         if solver == 'opencv':  # use openCV solver
 
             # FIXME: SHOULD UES THE COMMENTED LINES
-            for i in range(1):
-                for j in range(1):
+            for i in range(num_query):
+                for j in range(num_proto):
                     # FIXME: 这里的代码注释掉了，但是不注释掉直接死在这里了
-                    print("opencv solver running")
-                    print("similarity_map",similarity_map[i, j, :, :])
-
-                    print(weight_1.shape)
-                    print(weight_2.shape)
                     _, flow = emd_inference_opencv(1 - similarity_map[i, j, :, :], weight_1[i, j, :], weight_2[j, i, :])
-                    print("flow",flow)
                     similarity_map[i, j, :, :] = (similarity_map[i, j, :, :]) * torch.from_numpy(flow).cuda()
 
             # print("opencv solver finished")
@@ -283,6 +277,7 @@ class DeepEMD(MetricModel):
 
     def normalize_feature(self, x):
         if self.args.get("norm") == 'center':
+            print('center')
             x = x - x.mean(1).unsqueeze(1)
             return x
         else:
@@ -300,19 +295,11 @@ class DeepEMD(MetricModel):
 
         way = proto.shape[0]
         num_query = query.shape[0]
-        
-        print(way)
-        print(num_query)
-        print(proto.shape)
-        print(query.shape)
-
-
         query = query.view(query.shape[0], query.shape[1], -1)
         proto = proto.view(proto.shape[0], proto.shape[1], -1)
 
         proto = proto.unsqueeze(0).repeat([num_query, 1, 1, 1])
         query = query.unsqueeze(1).repeat([1, way, 1, 1])
-
         proto = proto.permute(0, 1, 3, 2)
         query = query.permute(0, 1, 3, 2)
         feature_size = proto.shape[-2]
@@ -320,8 +307,6 @@ class DeepEMD(MetricModel):
         if self.args.get("metric") == 'cosine':
             proto = proto.unsqueeze(-3)
             query = query.unsqueeze(-2)
-            print(feature_size)
-            # feature size: 64x64
             query = query.repeat(1, 1, 1, feature_size, 1)
             similarity_map = F.cosine_similarity(proto, query, dim=-1)
 
