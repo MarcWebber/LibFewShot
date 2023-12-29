@@ -6,7 +6,7 @@ way_num: 5
 shot_num: 1
 query_num: 1
 episode_size: 1
-batch_size: 128
+batch_size: 1
 classifier:
   kwargs:
     feat_dim: 640
