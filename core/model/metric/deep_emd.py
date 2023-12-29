@@ -40,7 +40,7 @@ class DeepEMD(MetricModel):
             return self.set_forward(batch)
 
     def set_forward(self, batch):
-        image = batch
+        image,global_target=batch
 
         # FIXME: UNUSED CODE，为什么我只用image[0]就可以了？这个显然是不对的啊，那我后面的128size的是个什么东西？
         # (support_image,
@@ -56,7 +56,7 @@ class DeepEMD(MetricModel):
          query_image,
          support_target,
          query_target,
-         ) = self.split_by_episode(image[0], mode=2)
+         ) = self.split_by_episode(image, mode=3)
 
         #  support torch.Size([80, 3, 84, 84])
         #  query  torch.Size([128, 3, 84, 84])
@@ -65,20 +65,19 @@ class DeepEMD(MetricModel):
         query_image = query_image.to(self.device)
         query_target = query_target.to(self.device)
 
-        episode_size, _, c, h, w = support_image.size()
+        episode_size, c, h, w = support_image.size()
 
         output_list = []
 
         # print(episode_size)
 
-        for i in range(episode_size):
-            episode_support_image = support_image[i].contiguous().reshape(-1, c, h, w)
-            episode_query_image = query_image[i].contiguous().reshape(-1, c, h, w)
-            episode_support_target = support_target[i].reshape(-1)
-            episode_query_targets = query_target[i].reshape(-1)
+        episode_support_image = support_image.reshape(-1, c, h, w)
+        episode_query_image = query_image.reshape(-1, c, h, w)
+        episode_support_target = support_target.reshape(-1)
+        episode_query_targets = query_target.reshape(-1)
 
-            logits = self.set_forward_adaptation(episode_support_image, episode_query_image)
-            output = self.forward_output(logits)
+        logits = self.set_forward_adaptation(episode_support_image, episode_query_image)
+        output = self.forward_output(logits)
 
         # FIXME: OUTPUT应该怎么计算？
         # output_list.append(output)
@@ -90,7 +89,7 @@ class DeepEMD(MetricModel):
         return output, acc
 
     def set_forward_loss(self, batch):
-        image = batch
+        image,global_target=batch
 
         # FIXME: UNUSED CODE，为什么我只用image[0]就可以了？这个显然是不对的啊，那我后面的128size的是个什么东西？
         # 这里怎么说进来的batch都应该是一个tensor而不是list啊，怎么回事
@@ -107,33 +106,40 @@ class DeepEMD(MetricModel):
          query_image,
          support_target,
          query_target,
-         ) = self.split_by_episode(image[0], mode=2)
+         ) = self.split_by_episode(image, mode=3)
 
-        print(support_image.shape)
-        print(query_image.shape)
-        print(support_target.shape)
-        print(query_image.shape)
+        #         print(support_image.shape)
+        #         print(query_image.shape)
+        #         print(support_target.shape)
+        #         print(query_image.shape)
 
         support_image = support_image.to(self.device)
         support_target = support_target.to(self.device)
         query_image = query_image.to(self.device)
         query_target = query_target.to(self.device)
 
-        episode_size, _, c, h, w = support_image.size()
+        episode_size, c, h, w = support_image.size()
 
         output_list = []
 
-        print(episode_size)
+        # print(episode_size)
 
 
-        for i in range(episode_size):
-            episode_support_image = support_image[i].contiguous().reshape(-1, c, h, w)
-            episode_query_image = query_image[i].contiguous().reshape(-1, c, h, w)
-            episode_support_target = support_target[i].reshape(-1)
-            episode_query_targets = query_target[i].reshape(-1)
-            logits = self.set_forward_adaptation(episode_support_image, episode_query_image)
-            # print(logits)
-            output = self.forward_output(logits)
+        # episode_support_image = support_image.contiguous().reshape(-1, c, h, w)
+        # episode_query_image = query_image.contiguous().reshape(-1, c, h, w)
+        # episode_support_target = support_target.reshape(-1)
+        # episode_query_targets = query_target.reshape(-1)
+        logits = self.set_forward_adaptation(support_image, query_image)
+        output = self.forward_output(logits)
+
+        # for i in range(episode_size):
+        #     episode_support_image = support_image[i].contiguous().reshape(-1, c, h, w)
+        #     episode_query_image = query_image[i].contiguous().reshape(-1, c, h, w)
+        #     episode_support_target = support_target[i].reshape(-1)
+        #     episode_query_targets = query_target[i].reshape(-1)
+        #     logits = self.set_forward_adaptation(episode_support_image, episode_query_image)
+        #     # print(logits)
+        #     output = self.forward_output(logits)
 
         # FIXME: OUTPUT应该怎么计算？
         # output_list.append(output)
@@ -153,6 +159,11 @@ class DeepEMD(MetricModel):
     '''
 
     def set_forward_adaptation(self, proto, query):
+
+        # INFO     torch.Size([1, 3, 84, 84])     trainer.py:372
+        # INFO     <class 'torch.Tensor'>         trainer.py:372
+        # INFO     torch.Size([1, 3, 84, 84])     trainer.py:372
+        # INFO     <class 'torch.Tensor'>         trainer.py:372
 
         weight_1 = self.get_weight_vector(query, proto)
         weight_2 = self.get_weight_vector(proto, query)
@@ -239,7 +250,7 @@ class DeepEMD(MetricModel):
                     # FIXME: 这里的代码注释掉了，但是不注释掉直接死在这里了
                     print("opencv solver running")
                     print("similarity_map",similarity_map[i, j, :, :])
-                    
+
                     print(weight_1.shape)
                     print(weight_2.shape)
                     _, flow = emd_inference_opencv(1 - similarity_map[i, j, :, :], weight_1[i, j, :], weight_2[j, i, :])
@@ -289,6 +300,11 @@ class DeepEMD(MetricModel):
 
         way = proto.shape[0]
         num_query = query.shape[0]
+        
+        print(way)
+        print(num_query)
+        print(proto.shape)
+        print(query.shape)
 
 
         query = query.view(query.shape[0], query.shape[1], -1)
@@ -304,6 +320,7 @@ class DeepEMD(MetricModel):
         if self.args.get("metric") == 'cosine':
             proto = proto.unsqueeze(-3)
             query = query.unsqueeze(-2)
+            print(feature_size)
             # feature size: 64x64
             query = query.repeat(1, 1, 1, feature_size, 1)
             similarity_map = F.cosine_similarity(proto, query, dim=-1)

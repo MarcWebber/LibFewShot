@@ -44,7 +44,6 @@ includes:
   - headers/misc.yaml
   - headers/model.yaml
   - headers/optimizer.yaml
-  - classifiers/DeepEMD.yaml
   - backbones/resnet12_emd.yaml
 log_interval: 100
 log_level: info
@@ -89,4 +88,4 @@ test_shot: 1
 test_way: 1
 train_episode: 100
 use_memory: false
-dataloader_num: 2
+dataloader_num: 1
