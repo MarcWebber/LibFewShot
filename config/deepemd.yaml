@@ -2,7 +2,7 @@ augment: true
 augment_method: null
 augment_times: 1
 augment_times_query: 1
-way_num: 1
+way_num: 5
 shot_num: 1
 query_num: 1
 episode_size: 1
