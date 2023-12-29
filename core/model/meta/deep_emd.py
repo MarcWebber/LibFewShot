@@ -109,33 +109,40 @@ class DeepEMD(MetaModel):
          query_image,
          support_target,
          query_target,
-         ) = self.split_by_episode(image, mode=2)
+         ) = self.split_by_episode(image, mode=3)
 
-        print(support_image.shape)
-        print(query_image.shape)
-        print(support_target.shape)
-        print(query_image.shape)
+#         print(support_image.shape)
+#         print(query_image.shape)
+#         print(support_target.shape)
+#         print(query_image.shape)
 
         support_image = support_image.to(self.device)
         support_target = support_target.to(self.device)
         query_image = query_image.to(self.device)
         query_target = query_target.to(self.device)
 
-        episode_size, _, c, h, w = support_image.size()
+        episode_size, c, h, w = support_image.size()
 
         output_list = []
 
-        print(episode_size)
+        # print(episode_size)
 
+        
+        # episode_support_image = support_image.contiguous().reshape(-1, c, h, w)
+        # episode_query_image = query_image.contiguous().reshape(-1, c, h, w)
+        # episode_support_target = support_target.reshape(-1)
+        # episode_query_targets = query_target.reshape(-1)
+        logits = self.set_forward_adaptation(support_image, query_image)
+        output = self.forward_output(logits)
 
-        for i in range(episode_size):
-            episode_support_image = support_image[i].contiguous().reshape(-1, c, h, w)
-            episode_query_image = query_image[i].contiguous().reshape(-1, c, h, w)
-            episode_support_target = support_target[i].reshape(-1)
-            episode_query_targets = query_target[i].reshape(-1)
-            logits = self.set_forward_adaptation(episode_support_image, episode_query_image)
-            # print(logits)
-            output = self.forward_output(logits)
+        # for i in range(episode_size):
+        #     episode_support_image = support_image[i].contiguous().reshape(-1, c, h, w)
+        #     episode_query_image = query_image[i].contiguous().reshape(-1, c, h, w)
+        #     episode_support_target = support_target[i].reshape(-1)
+        #     episode_query_targets = query_target[i].reshape(-1)
+        #     logits = self.set_forward_adaptation(episode_support_image, episode_query_image)
+        #     # print(logits)
+        #     output = self.forward_output(logits)
 
         # FIXME: OUTPUT应该怎么计算？
         # output_list.append(output)
@@ -155,6 +162,16 @@ class DeepEMD(MetaModel):
     '''
 
     def set_forward_adaptation(self, proto, query):
+        
+        # INFO     torch.Size([1, 3, 84, 84])     trainer.py:372
+        # INFO     <class 'torch.Tensor'>         trainer.py:372
+        # INFO     torch.Size([1, 3, 84, 84])     trainer.py:372
+        # INFO     <class 'torch.Tensor'>         trainer.py:372
+        
+        print(proto.shape)
+        print(type(proto))
+        print(query.shape)
+        print(type(proto))
 
         weight_1 = self.get_weight_vector(query, proto)
         weight_2 = self.get_weight_vector(proto, query)
@@ -306,6 +323,7 @@ class DeepEMD(MetaModel):
         if self.args.get("metric") == 'cosine':
             proto = proto.unsqueeze(-3)
             query = query.unsqueeze(-2)
+            print(feature_size)
             # feature size: 64x64
             query = query.repeat(1, 1, 1, feature_size, 1)
             similarity_map = F.cosine_similarity(proto, query, dim=-1)
