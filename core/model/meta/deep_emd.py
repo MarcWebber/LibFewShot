@@ -5,15 +5,16 @@ from core.model.backbone.utils.deep_emd import emd_inference_opencv, emd_inferen
 from core.model.backbone.resnet_12_emd import ResNet
 import torch.nn.functional as F
 
-from ...utils import accuracy
+from core.utils import accuracy
 
 
 # def count_acc(logits, label):
-# pred = torch.argmax(logits, dim=1)
-# if torch.cuda.is_available():
-#     return (pred == label).type(torch.cuda.FloatTensor).mean().item()
-# else:
-#     return (pred == label).type(torch.FloatTensor).mean().item()
+#     pred = torch.argmax(logits, dim=1)
+#     if torch.cuda.is_available():
+#         return (pred == label).type(torch.cuda.FloatTensor).mean().item()
+#     else:
+#         return (pred == label).type(torch.FloatTensor).mean().item()
+
 
 # acc = count_acc(logits,label)
 
@@ -26,12 +27,13 @@ class DeepEMD(MetaModel):
         self.args = args
         self.loss_func = nn.CrossEntropyLoss()
         self.encoder = ResNet()
+        self.k = self.args.get("way") * self.args.get("shot")
+
         if self.mode == 'pre_train':
             self.fc = nn.Linear(640, self.args.num_class)
 
     def forward_output(self, logits):
-        # FIXME:
-        return 1
+        return torch.argmax(logits, dim=1)
 
     def forward(self, batch):
         if self.training:
@@ -40,114 +42,48 @@ class DeepEMD(MetaModel):
             return self.set_forward(batch)
 
     def set_forward(self, batch):
-        image = batch[0]
-
-        # FIXME: UNUSED CODE，为什么我只用image[0]就可以了？这个显然是不对的啊，那我后面的128size的是个什么东西？
+        image, _ = batch
+        # print(image.shape)
+        image = image.to(self.device)
         # (support_image,
         #  query_image,
         #  support_target,
         #  query_target,
-        #  ) = (image[0],
-        #       image[2],
-        #       image[1],
-        #       image[3],)
+        #  ) = self.split_by_episode(image, mode=3)
+        data = self.encode(image)
+        data_shot, data_query = data[:self.k], data[self.k:]
+        label = torch.arange(self.args.get("way")).repeat(self.args.get("query"))
+        label = label.type(torch.cuda.LongTensor)
+        if self.args.get("shot") > 1:
+            data_shot = self.get_sfc(data_shot)
+        logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
 
-        (support_image,
-         query_image,
-         support_target,
-         query_target,
-         ) = self.split_by_episode(image, mode=3)
-
-        #  support torch.Size([80, 3, 84, 84])
-        #  query  torch.Size([128, 3, 84, 84])
-        support_image = support_image.to(self.device)
-        support_target = support_target.to(self.device)
-        query_image = query_image.to(self.device)
-        query_target = query_target.to(self.device)
-
-        episode_size, c, h, w = support_image.size()
-
-        output_list = []
-
-        # print(episode_size)
-
-        episode_support_image = support_image.reshape(-1, c, h, w)
-        episode_query_image = query_image.reshape(-1, c, h, w)
-        episode_support_target = support_target.reshape(-1)
-        episode_query_targets = query_target.reshape(-1)
-
-        logits = self.set_forward_adaptation(episode_support_image, episode_query_image)
+        acc = accuracy(logits, label)
         output = self.forward_output(logits)
-
-        # FIXME: OUTPUT应该怎么计算？
-        # output_list.append(output)
-        # output = torch.cat(output_list, dim=0)
-        # TODO: LOSS的计算在哪里？
-        # FIXME
-        acc = 1
-        # acc = accuracy(output, query_target.contiguous().view(-1))
         return output, acc
 
     def set_forward_loss(self, batch):
-        image, global_target = batch
-
-        # FIXME: UNUSED CODE，为什么我只用image[0]就可以了？这个显然是不对的啊，那我后面的128size的是个什么东西？
-        # 这里怎么说进来的batch都应该是一个tensor而不是list啊，怎么回事
+        image, _ = batch
+        # print(image.shape)
+        image = image.to(self.device)
         # (support_image,
         #  query_image,
         #  support_target,
         #  query_target,
-        #  ) = (image[0],
-        #       image[2],
-        #       image[1],
-        #       image[3],)
+        #  ) = self.split_by_episode(image, mode=3)
+        data = self.encode(image)
+        data_shot, data_query = data[:self.k], data[self.k:]
+        label = torch.arange(self.args.get("way")).repeat(self.args.get("query"))
+        label = label.type(torch.cuda.LongTensor)
 
-        (support_image,
-         query_image,
-         support_target,
-         query_target,
-         ) = self.split_by_episode(image, mode=3)
+        if self.args.get("shot") > 1:
+            data_shot = self.get_sfc(data_shot)
+        logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
 
-        #         print(support_image.shape)
-        #         print(query_image.shape)
-        #         print(support_target.shape)
-        #         print(query_image.shape)
-
-        support_image = support_image.to(self.device)
-        support_target = support_target.to(self.device)
-        query_image = query_image.to(self.device)
-        query_target = query_target.to(self.device)
-
-        episode_size, c, h, w = support_image.size()
-
-        output_list = []
-
-        # print(episode_size)
-
-
-        # episode_support_image = support_image.contiguous().reshape(-1, c, h, w)
-        # episode_query_image = query_image.contiguous().reshape(-1, c, h, w)
-        # episode_support_target = support_target.reshape(-1)
-        # episode_query_targets = query_target.reshape(-1)
-        logits = self.set_forward_adaptation(support_image, query_image)
+        # print(global_target)
+        loss = self.loss_func(logits, label)
+        acc = accuracy(logits, label)
         output = self.forward_output(logits)
-
-        # for i in range(episode_size):
-        #     episode_support_image = support_image[i].contiguous().reshape(-1, c, h, w)
-        #     episode_query_image = query_image[i].contiguous().reshape(-1, c, h, w)
-        #     episode_support_target = support_target[i].reshape(-1)
-        #     episode_query_targets = query_target[i].reshape(-1)
-        #     logits = self.set_forward_adaptation(episode_support_image, episode_query_image)
-        #     # print(logits)
-        #     output = self.forward_output(logits)
-
-        # FIXME: OUTPUT应该怎么计算？
-        # output_list.append(output)
-        # output = torch.cat(output_list, dim=0)
-        # TODO: LOSS的计算在哪里？
-        # FIXME
-        loss = torch.tensor(10.0, requires_grad=True)
-        acc = 1
         # acc = accuracy(output, query_target.contiguous().view(-1))
         return output, acc, loss
 
@@ -164,7 +100,7 @@ class DeepEMD(MetaModel):
         # INFO     <class 'torch.Tensor'>         trainer.py:372
         # INFO     torch.Size([1, 3, 84, 84])     trainer.py:372
         # INFO     <class 'torch.Tensor'>         trainer.py:372
-
+        proto = proto.squeeze(0)
         weight_1 = self.get_weight_vector(query, proto)
         weight_2 = self.get_weight_vector(proto, query)
 
@@ -244,23 +180,14 @@ class DeepEMD(MetaModel):
         _num_node = weight_1.shape[-1]
         if solver == 'opencv':  # use openCV solver
 
-            # FIXME: SHOULD UES THE COMMENTED LINES
-            for i in range(1):
-                for j in range(1):
-                    # FIXME: 这里的代码注释掉了，但是不注释掉直接死在这里了
-                    print("opencv solver running")
-                    print("similarity_map",similarity_map[i, j, :, :])
-
-                    print(weight_1.shape)
-                    print(weight_2.shape)
+            for i in range(num_query):
+                for j in range(num_proto):
                     _, flow = emd_inference_opencv(1 - similarity_map[i, j, :, :], weight_1[i, j, :], weight_2[j, i, :])
-                    print("flow",flow)
                     similarity_map[i, j, :, :] = (similarity_map[i, j, :, :]) * torch.from_numpy(flow).cuda()
 
             # print("opencv solver finished")
             temperature = (self.args.get("temperature") / _num_node)
             logitis = similarity_map.sum(-1).sum(-1) * temperature
-            # print("logitis", logitis)
             return logitis
 
         elif solver == 'qpth':
@@ -291,23 +218,13 @@ class DeepEMD(MetaModel):
     # FIXME: 这里应该就是proto.shape[0]对应shot,query.shape[0]对应query才对，但事实上不是
     def get_similiarity_map(self, proto, query):
 
-        # FIXME: 我改了1-1, QUERY=5，避免爆显存
-        # proto = proto[1:2]
-        # query = query[1:2]
-
-        # way = 1
-        # num_query= 5
-
         way = proto.shape[0]
         num_query = query.shape[0]
-
-
         query = query.view(query.shape[0], query.shape[1], -1)
         proto = proto.view(proto.shape[0], proto.shape[1], -1)
 
         proto = proto.unsqueeze(0).repeat([num_query, 1, 1, 1])
         query = query.unsqueeze(1).repeat([1, way, 1, 1])
-
         proto = proto.permute(0, 1, 3, 2)
         query = query.permute(0, 1, 3, 2)
         feature_size = proto.shape[-2]
@@ -315,8 +232,6 @@ class DeepEMD(MetaModel):
         if self.args.get("metric") == 'cosine':
             proto = proto.unsqueeze(-3)
             query = query.unsqueeze(-2)
-            print(feature_size)
-            # feature size: 64x64
             query = query.repeat(1, 1, 1, feature_size, 1)
             similarity_map = F.cosine_similarity(proto, query, dim=-1)
 
@@ -327,10 +242,9 @@ class DeepEMD(MetaModel):
             similarity_map = (proto - query).pow(2).sum(-1)
             similarity_map = 1 - similarity_map
 
-
         return similarity_map
 
-    def encode(self, x, dense=True):
+    def encode(self, x, dense=False):
 
         if x.shape.__len__() == 5:  # batch of image patches
             num_data, num_patch = x.shape[:2]

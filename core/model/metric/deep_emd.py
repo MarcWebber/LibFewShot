@@ -5,13 +5,15 @@ from core.model.backbone.utils.deep_emd import emd_inference_opencv, emd_inferen
 from core.model.backbone.resnet_12_emd import ResNet
 import torch.nn.functional as F
 
+from core.utils import accuracy
 
-def count_acc(logits, label):
-    pred = torch.argmax(logits, dim=1)
-    if torch.cuda.is_available():
-        return (pred == label).type(torch.cuda.FloatTensor).mean().item()
-    else:
-        return (pred == label).type(torch.FloatTensor).mean().item()
+
+# def count_acc(logits, label):
+#     pred = torch.argmax(logits, dim=1)
+#     if torch.cuda.is_available():
+#         return (pred == label).type(torch.cuda.FloatTensor).mean().item()
+#     else:
+#         return (pred == label).type(torch.FloatTensor).mean().item()
 
 
 # acc = count_acc(logits,label)
@@ -31,8 +33,7 @@ class DeepEMD(MetricModel):
             self.fc = nn.Linear(640, self.args.num_class)
 
     def forward_output(self, logits):
-        # FIXME:
-        return 1
+        return torch.argmax(logits, dim=1)
 
     def forward(self, batch):
         if self.training:
@@ -57,7 +58,7 @@ class DeepEMD(MetricModel):
             data_shot = self.get_sfc(data_shot)
         logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
 
-        acc = count_acc(logits, label)
+        acc = accuracy(logits, label)
         output = self.forward_output(logits)
         return output, acc
 
@@ -81,7 +82,7 @@ class DeepEMD(MetricModel):
 
         # print(global_target)
         loss = self.loss_func(logits, label)
-        acc = count_acc(logits, label)
+        acc = accuracy(logits, label)
         output = self.forward_output(logits)
         # acc = accuracy(output, query_target.contiguous().view(-1))
         return output, acc, loss
