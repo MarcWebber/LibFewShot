@@ -58,15 +58,13 @@ classifier:
 #     eta_min: 0
 #   name: CosineAnnealingLR
 
-# optimizer:
-#   kwargs:
-#     lr: 0.1
-#     momentum: 0.9
-#     nesterov: true
-#     weight_decay: 0.0005
-#   name: SGD
-#   other:
-#     emb_func: 0.1
+optimizer:
+  kwargs:
+    lr: 0.1
+    momentum: 0.9
+    nesterov: true
+    weight_decay: 0.0005
+  name: SGD
 
 
   

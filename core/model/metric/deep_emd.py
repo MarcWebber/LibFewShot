@@ -48,7 +48,7 @@ class DeepEMD(MetricModel):
         image, _ = batch
         # print(image.shape)
         image = image.to(self.device)
-        print("global_target", _)
+        # print("global_target", _)
 
         if self.mode == 'pre_train':
             pass
