@@ -4,32 +4,28 @@ from .metric_model import MetricModel
 from core.model.backbone.utils.deep_emd import emd_inference_opencv, emd_inference_qpth
 from core.model.backbone.resnet_12_emd import ResNet
 import torch.nn.functional as F
+from core.utils import accuracy
 
 
-def accuracy(logits, label):
-    pred = torch.argmax(logits, dim=1)
-    if torch.cuda.is_available():
-        return (pred == label).type(torch.cuda.FloatTensor).mean().item()
-    else:
-        return (pred == label).type(torch.FloatTensor).mean().item()
+class Network(MetricModel):
 
-
-class DeepEMD(MetricModel):
-
-    def __init__(self, mode, args, num_classes, **kwargs):
-        super(DeepEMD, self).__init__(**kwargs)
-
+    def __init__(self, mode, args, **kwargs):
+        super(Network, self).__init__(**kwargs)
         self.mode = mode
         self.args = args
-        self.num_classes = num_classes
         self.loss_func = nn.CrossEntropyLoss()
         self.encoder = ResNet()
         self.k = self.args.get("way") * self.args.get("shot")
 
         if self.mode == 'pre_train':
-            self.fc = nn.Linear(640, self.num_classes)
+            self.fc = nn.Linear(640, self.args.num_class)
 
-            
+    def reshuffle_data(self, data_shot, labels, cls):
+        label_len = labels.__len__()
+        per_len = label_len // cls
+        idxs = torch.arange(label_len) // cls + (torch.arange(label_len) % cls) * per_len
+        return data_shot[idxs], labels[idxs]
+
     def forward_output(self, logits):
         return torch.argmax(logits, dim=1)
 
@@ -58,31 +54,26 @@ class DeepEMD(MetricModel):
         image, global_target = batch
         image = image.to(self.device)
         global_target = global_target.to(self.device)
-        
-        
 
         if self.mode == 'pre_train':
-            image , global_target = self.reshuffle_data(image, global_target.reshape(-1), self.args.get("way"))
-            label = torch.arange(self.args.get("way")).repeat(self.args.get("query"))
-            label = label.type(torch.LongTensor)
-            label = label.cuda()
+            image, global_target = self.reshuffle_data(image, global_target.reshape(-1), self.way_num)
+            feat = self.emb_func(image)
+            label = global_target
 
-            logits = self.fc(image.squeeze(-1).squeeze(-1))
+            logits = self.fc(feat.squeeze(-1).squeeze(-1))
 
         else:
-            print("global_target",global_target)
             data = self.encode(image)
             data_shot, data_query = data[:self.k], data[self.k:]
             label = torch.arange(self.args.get("way")).repeat(self.args.get("query"))
             label = label.type(torch.cuda.LongTensor)
-            print("label",label)
+
             if self.args.get("shot") > 1:
                 data_shot = self.get_sfc(data_shot)
             logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
             output = self.forward_output(logits)
-            print("output",output)
-        
-        loss = self.loss_func(output, label)
+
+        loss = self.loss_func(logits, label)
         acc = accuracy(logits, label)
         return output, acc, loss
 
@@ -245,3 +236,25 @@ class DeepEMD(MetricModel):
         feature_list.append(feature.view(feature.shape[0], feature.shape[1], 1, -1))
         out = torch.cat(feature_list, dim=-1)
         return out
+
+
+class DeepEMD(MetricModel):
+    def __init__(self, mode, args, **kwargs):
+        super(DeepEMD, self).__init__(**kwargs)
+        self.deep_emd= Network(mode, args, **kwargs)
+        print("trying to read model----------")
+        print("pretrain_path",args.get("pretrain_path"))
+        if args.get("pretrain_path") is not None:
+            print("----------------------model loaded----------------------------------------------------")
+            self.deep_emd.load_state_dict(torch.load(args.get("pretrain_path")))
+    
+    def forward(self, batch):
+        return self.deep_emd.forward(batch)
+    def set_forward_loss(self, batch):
+        return self.deep_emd.set_forward_loss(batch)
+    
+    def set_forward(self, batch):
+        return self.deep_emd.set_forward(batch)
+    
+    
+    

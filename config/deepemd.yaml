@@ -33,6 +33,7 @@ classifier:
     temperature_attn: 5.0
     mode: meta
     args:
+      # pretrain_path: results/deepemd_pretrain_model/miniimagenet/resnet12/max_acc.pth
       norm: center
       way: 5
       shot: 1
