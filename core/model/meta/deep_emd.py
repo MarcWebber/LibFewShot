@@ -18,7 +18,7 @@ from core.utils import accuracy
 
 # acc = count_acc(logits,label)
 
-class DeepEMD(MetaModel):
+class DeepEMD(MetricModel):
 
     def __init__(self, mode, args, **kwargs):
         super(DeepEMD, self).__init__(**kwargs)
@@ -71,19 +71,25 @@ class DeepEMD(MetaModel):
         #  support_target,
         #  query_target,
         #  ) = self.split_by_episode(image, mode=3)
-        data = self.encode(image)
-        data_shot, data_query = data[:self.k], data[self.k:]
-        label = torch.arange(self.args.get("way")).repeat(self.args.get("query"))
-        label = label.type(torch.cuda.LongTensor)
+        if self.mode == 'pre_train':
+            # FIXME: FINISH THIS
+            return
 
-        if self.args.get("shot") > 1:
-            data_shot = self.get_sfc(data_shot)
-        logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
+        else:
+
+            data = self.encode(image)
+            data_shot, data_query = data[:self.k], data[self.k:]
+            label = torch.arange(self.args.get("way")).repeat(self.args.get("query"))
+            label = label.type(torch.cuda.LongTensor)
+
+            if self.args.get("shot") > 1:
+                data_shot = self.get_sfc(data_shot)
+            logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
+            output = self.forward_output(logits)
 
         # print(global_target)
         loss = self.loss_func(logits, label)
         acc = accuracy(logits, label)
-        output = self.forward_output(logits)
         # acc = accuracy(output, query_target.contiguous().view(-1))
         return output, acc, loss
 
@@ -244,7 +250,7 @@ class DeepEMD(MetaModel):
 
         return similarity_map
 
-    def encode(self, x, dense=False):
+    def encode(self, x, dense=True):
 
         if x.shape.__len__() == 5:  # batch of image patches
             num_data, num_patch = x.shape[:2]

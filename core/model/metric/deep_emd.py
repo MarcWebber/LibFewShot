@@ -4,19 +4,7 @@ from .metric_model import MetricModel
 from core.model.backbone.utils.deep_emd import emd_inference_opencv, emd_inference_qpth
 from core.model.backbone.resnet_12_emd import ResNet
 import torch.nn.functional as F
-
 from core.utils import accuracy
-
-
-# def count_acc(logits, label):
-#     pred = torch.argmax(logits, dim=1)
-#     if torch.cuda.is_available():
-#         return (pred == label).type(torch.cuda.FloatTensor).mean().item()
-#     else:
-#         return (pred == label).type(torch.FloatTensor).mean().item()
-
-
-# acc = count_acc(logits,label)
 
 class DeepEMD(MetricModel):
 
@@ -43,13 +31,7 @@ class DeepEMD(MetricModel):
 
     def set_forward(self, batch):
         image, _ = batch
-        # print(image.shape)
         image = image.to(self.device)
-        # (support_image,
-        #  query_image,
-        #  support_target,
-        #  query_target,
-        #  ) = self.split_by_episode(image, mode=3)
         data = self.encode(image)
         data_shot, data_query = data[:self.k], data[self.k:]
         label = torch.arange(self.args.get("way")).repeat(self.args.get("query"))
@@ -66,40 +48,27 @@ class DeepEMD(MetricModel):
         image, _ = batch
         # print(image.shape)
         image = image.to(self.device)
-        # (support_image,
-        #  query_image,
-        #  support_target,
-        #  query_target,
-        #  ) = self.split_by_episode(image, mode=3)
-        data = self.encode(image)
-        data_shot, data_query = data[:self.k], data[self.k:]
-        label = torch.arange(self.args.get("way")).repeat(self.args.get("query"))
-        label = label.type(torch.cuda.LongTensor)
+        print("global_target", _)
 
-        if self.args.get("shot") > 1:
-            data_shot = self.get_sfc(data_shot)
-        logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
+        if self.mode == 'pre_train':
+            pass
+        else:
+            data = self.encode(image)
+            data_shot, data_query = data[:self.k], data[self.k:]
+            label = torch.arange(self.args.get("way")).repeat(self.args.get("query"))
+            label = label.type(torch.cuda.LongTensor)
 
-        # print(global_target)
+            if self.args.get("shot") > 1:
+                data_shot = self.get_sfc(data_shot)
+            logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
+            output = self.forward_output(logits)
+
         loss = self.loss_func(logits, label)
         acc = accuracy(logits, label)
-        output = self.forward_output(logits)
-        # acc = accuracy(output, query_target.contiguous().view(-1))
         return output, acc, loss
 
-    # FIXME: BUG HERE
-
-    '''
-    :usage 用于两张图得计算距离
-    :return: logitis距离
-    '''
 
     def set_forward_adaptation(self, proto, query):
-
-        # INFO     torch.Size([1, 3, 84, 84])     trainer.py:372
-        # INFO     <class 'torch.Tensor'>         trainer.py:372
-        # INFO     torch.Size([1, 3, 84, 84])     trainer.py:372
-        # INFO     <class 'torch.Tensor'>         trainer.py:372
         proto = proto.squeeze(0)
         weight_1 = self.get_weight_vector(query, proto)
         weight_2 = self.get_weight_vector(proto, query)
@@ -118,10 +87,6 @@ class DeepEMD(MetricModel):
         return self.fc(self.encode(_input, dense=False).squeeze(-1).squeeze(-1))
 
     def get_weight_vector(self, A, B):
-
-        # M = 1
-        # N = 80
-
         M = A.shape[0]
         N = B.shape[0]
 
@@ -139,12 +104,6 @@ class DeepEMD(MetricModel):
         combination = F.relu(combination) + 1e-3
         return combination
 
-    # if args.shot > 1:
-    #     data_shot = model.module.get_sfc(data_shot)
-    # logits = model((data_shot.unsqueeze(0).repeat(num_gpu, 1, 1, 1, 1), data_query))
-    # acc = count_acc(logits, label) * 100
-
-    # 当shot>1时，需要使用get_sfc
     def get_sfc(self, support):
         support = support.squeeze(0)
         # init the proto
@@ -154,7 +113,6 @@ class DeepEMD(MetricModel):
 
         optimizer = torch.optim.SGD([SFC], lr=self.args.get("sfc_lr"), momentum=0.9, dampening=0.9, weight_decay=0)
 
-        # crate label for finetune
         label_shot = torch.arange(self.args.get("way")).repeat(self.args.get("shot"))
         label_shot = label_shot.type(torch.cuda.LongTensor)
 
@@ -179,13 +137,11 @@ class DeepEMD(MetricModel):
         num_proto = similarity_map.shape[1]
         _num_node = weight_1.shape[-1]
         if solver == 'opencv':  # use openCV solver
-
             for i in range(num_query):
                 for j in range(num_proto):
                     _, flow = emd_inference_opencv(1 - similarity_map[i, j, :, :], weight_1[i, j, :], weight_2[j, i, :])
                     similarity_map[i, j, :, :] = (similarity_map[i, j, :, :]) * torch.from_numpy(flow).cuda()
 
-            # print("opencv solver finished")
             temperature = (self.args.get("temperature") / _num_node)
             logitis = similarity_map.sum(-1).sum(-1) * temperature
             return logitis
@@ -215,7 +171,6 @@ class DeepEMD(MetricModel):
         else:
             return x
 
-    # FIXME: 这里应该就是proto.shape[0]对应shot,query.shape[0]对应query才对，但事实上不是
     def get_similiarity_map(self, proto, query):
 
         way = proto.shape[0]
