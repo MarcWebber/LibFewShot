@@ -4,22 +4,32 @@ from .metric_model import MetricModel
 from core.model.backbone.utils.deep_emd import emd_inference_opencv, emd_inference_qpth
 from core.model.backbone.resnet_12_emd import ResNet
 import torch.nn.functional as F
-from core.utils import accuracy
+
+
+def accuracy(logits, label):
+    pred = torch.argmax(logits, dim=1)
+    if torch.cuda.is_available():
+        return (pred == label).type(torch.cuda.FloatTensor).mean().item()
+    else:
+        return (pred == label).type(torch.FloatTensor).mean().item()
+
 
 class DeepEMD(MetricModel):
 
-    def __init__(self, mode, args, **kwargs):
+    def __init__(self, mode, args, num_classes, **kwargs):
         super(DeepEMD, self).__init__(**kwargs)
 
         self.mode = mode
         self.args = args
+        self.num_classes = num_classes
         self.loss_func = nn.CrossEntropyLoss()
         self.encoder = ResNet()
         self.k = self.args.get("way") * self.args.get("shot")
 
         if self.mode == 'pre_train':
-            self.fc = nn.Linear(640, self.args.num_class)
+            self.fc = nn.Linear(640, self.num_classes)
 
+            
     def forward_output(self, logits):
         return torch.argmax(logits, dim=1)
 
@@ -45,28 +55,36 @@ class DeepEMD(MetricModel):
         return output, acc
 
     def set_forward_loss(self, batch):
-        image, _ = batch
-        # print(image.shape)
+        image, global_target = batch
         image = image.to(self.device)
-        # print("global_target", _)
+        global_target = global_target.to(self.device)
+        
+        
 
         if self.mode == 'pre_train':
-            pass
+            image , global_target = self.reshuffle_data(image, global_target.reshape(-1), self.args.get("way"))
+            label = torch.arange(self.args.get("way")).repeat(self.args.get("query"))
+            label = label.type(torch.LongTensor)
+            label = label.cuda()
+
+            logits = self.fc(image.squeeze(-1).squeeze(-1))
+
         else:
+            print("global_target",global_target)
             data = self.encode(image)
             data_shot, data_query = data[:self.k], data[self.k:]
             label = torch.arange(self.args.get("way")).repeat(self.args.get("query"))
             label = label.type(torch.cuda.LongTensor)
-
+            print("label",label)
             if self.args.get("shot") > 1:
                 data_shot = self.get_sfc(data_shot)
             logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
             output = self.forward_output(logits)
-
-        loss = self.loss_func(logits, label)
+            print("output",output)
+        
+        loss = self.loss_func(output, label)
         acc = accuracy(logits, label)
         return output, acc, loss
-
 
     def set_forward_adaptation(self, proto, query):
         proto = proto.squeeze(0)

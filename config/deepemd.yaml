@@ -31,7 +31,7 @@ classifier:
     num_classes: 64
     temperature: 0.2
     temperature_attn: 5.0
-    mode: pretrain
+    mode: meta
     args:
       norm: center
       way: 5
@@ -52,11 +52,11 @@ classifier:
   
 
 
-# lr_scheduler:
-#   kwargs:
-#     T_max: 100
-#     eta_min: 0
-#   name: CosineAnnealingLR
+lr_scheduler:
+  kwargs:
+    T_max: 100
+    eta_min: 0
+  name: CosineAnnealingLR
 
 optimizer:
   kwargs:
