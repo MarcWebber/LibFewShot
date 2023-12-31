@@ -4,9 +4,9 @@ augment_times: 1
 augment_times_query: 1
 way_num: 5
 shot_num: 1
-query_num: 1
+query_num: 15
 episode_size: 1
-batch_size: 1
+batch_size: 128
 classifier:
   kwargs:
     feat_dim: 640
@@ -19,7 +19,7 @@ classifier:
       norm: center
       way: 5
       shot: 1
-      query: 1
+      query: 15
       deepemd: fcn
       solver: opencv
       num_patch: 9
@@ -83,9 +83,9 @@ tag: null
 tb_scale: 1.5
 test_episode: 100
 test_epoch: 5
-test_query: 2
+test_query: 15
 test_shot: 1
-test_way: 1
+test_way: 5
 train_episode: 100
 use_memory: false
 dataloader_num: 1
