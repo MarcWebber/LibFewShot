@@ -1,29 +1,20 @@
+import copy
+
 import torch
 import torch.nn as nn
-from .meta_model import MetaModel
+from .metric_model import MetricModel
 from core.model.backbone.utils.deep_emd import emd_inference_opencv, emd_inference_qpth
 from core.model.backbone.resnet_12_emd import ResNet
 import torch.nn.functional as F
-
 from core.utils import accuracy
 
 
-# def count_acc(logits, label):
-#     pred = torch.argmax(logits, dim=1)
-#     if torch.cuda.is_available():
-#         return (pred == label).type(torch.cuda.FloatTensor).mean().item()
-#     else:
-#         return (pred == label).type(torch.FloatTensor).mean().item()
+class Network(MetricModel):
 
-
-# acc = count_acc(logits,label)
-
-class DeepEMD(MetricModel):
-
-    def __init__(self, mode, args, **kwargs):
-        super(DeepEMD, self).__init__(**kwargs)
-
+    def __init__(self, mode, emb_func_path,args, **kwargs):
+        super(Network, self).__init__(**kwargs)
         self.mode = mode
+        self.emb_func = self._load_state_dict(self.emb_func, emb_func_path, False)
         self.args = args
         self.loss_func = nn.CrossEntropyLoss()
         self.encoder = ResNet()
@@ -31,6 +22,21 @@ class DeepEMD(MetricModel):
 
         if self.mode == 'pre_train':
             self.fc = nn.Linear(640, self.args.num_class)
+
+    def _load_state_dict(self, model, state_dict_path, is_distill):
+        new_model = None
+        if is_distill and state_dict_path is not None:
+            new_model = copy.deepcopy(model)
+            model_state_dict = torch.load(state_dict_path, map_location="cpu")
+            new_model.load_state_dict(model_state_dict)
+        return new_model
+
+
+    def reshuffle_data(self, data_shot, labels, cls):
+        label_len = labels.__len__()
+        per_len = label_len // cls
+        idxs = torch.arange(label_len) // cls + (torch.arange(label_len) % cls) * per_len
+        return data_shot[idxs], labels[idxs]
 
     def forward_output(self, logits):
         return torch.argmax(logits, dim=1)
@@ -42,70 +48,68 @@ class DeepEMD(MetricModel):
             return self.set_forward(batch)
 
     def set_forward(self, batch):
-        image, _ = batch
-        # print(image.shape)
+        image, global_target = batch
         image = image.to(self.device)
-        # (support_image,
-        #  query_image,
-        #  support_target,
-        #  query_target,
-        #  ) = self.split_by_episode(image, mode=3)
-        data = self.encode(image)
-        data_shot, data_query = data[:self.k], data[self.k:]
-        label = torch.arange(self.args.get("way")).repeat(self.args.get("query"))
-        label = label.type(torch.cuda.LongTensor)
-        if self.args.get("shot") > 1:
-            data_shot = self.get_sfc(data_shot)
-        logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
+        global_target = global_target.to(self.device)
+
+        if self.mode == 'pre_train':
+            image, global_target = self.reshuffle_data(image, global_target.reshape(-1), self.way_num)
+            feat = self.emb_func(image)
+            label = global_target
+
+            logits = self.fc(feat.squeeze(-1).squeeze(-1))
+
+        else:
+            label = torch.tensor([[i]*(self.args.get("query")+self.args.get("shot")) for i in range(self.args.get("way"))])
+            label = label.reshape(-1)
+            label = label.type(torch.cuda.LongTensor)
+            data, label = self.reshuffle_data(image, label, self.args.get("way"))
+            feat = self.emb_func(data)
+            data_shot, data_query = feat[:self.k], feat[self.k:]
+            if self.args.get("shot") > 1:
+                data_shot = self.get_sfc(data_shot)
+            # logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
+            label = label[self.k:]
+            logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1),data_query)
+            output = self.forward_output(logits)
 
         acc = accuracy(logits, label)
-        output = self.forward_output(logits)
         return output, acc
 
     def set_forward_loss(self, batch):
-        image, _ = batch
-        # print(image.shape)
+        image, global_target = batch
         image = image.to(self.device)
-        # (support_image,
-        #  query_image,
-        #  support_target,
-        #  query_target,
-        #  ) = self.split_by_episode(image, mode=3)
+        global_target = global_target.to(self.device)
+
         if self.mode == 'pre_train':
-            # FIXME: FINISH THIS
-            return
+            image, global_target = self.reshuffle_data(image, global_target.reshape(-1), self.way_num)
+            feat = self.emb_func(image)
+            label = global_target
+
+            logits = self.fc(feat.squeeze(-1).squeeze(-1))
 
         else:
-
-            data = self.encode(image)
-            data_shot, data_query = data[:self.k], data[self.k:]
-            label = torch.arange(self.args.get("way")).repeat(self.args.get("query"))
+            label = torch.tensor([[i]*(self.args.get("query")+self.args.get("shot")) for i in range(self.args.get("way"))])
+            label = label.reshape(-1)
             label = label.type(torch.cuda.LongTensor)
+            data, label = self.reshuffle_data(image, label, self.args.get("way"))
+
+            feat = self.emb_func(data)
+
+            data_shot, data_query = feat[:self.k], feat[self.k:]
+
 
             if self.args.get("shot") > 1:
                 data_shot = self.get_sfc(data_shot)
-            logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
+            label = label[self.k:]
+            logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1),data_query)
             output = self.forward_output(logits)
 
-        # print(global_target)
         loss = self.loss_func(logits, label)
         acc = accuracy(logits, label)
-        # acc = accuracy(output, query_target.contiguous().view(-1))
         return output, acc, loss
 
-    # FIXME: BUG HERE
-
-    '''
-    :usage 用于两张图得计算距离
-    :return: logitis距离
-    '''
-
     def set_forward_adaptation(self, proto, query):
-
-        # INFO     torch.Size([1, 3, 84, 84])     trainer.py:372
-        # INFO     <class 'torch.Tensor'>         trainer.py:372
-        # INFO     torch.Size([1, 3, 84, 84])     trainer.py:372
-        # INFO     <class 'torch.Tensor'>         trainer.py:372
         proto = proto.squeeze(0)
         weight_1 = self.get_weight_vector(query, proto)
         weight_2 = self.get_weight_vector(proto, query)
@@ -124,10 +128,6 @@ class DeepEMD(MetricModel):
         return self.fc(self.encode(_input, dense=False).squeeze(-1).squeeze(-1))
 
     def get_weight_vector(self, A, B):
-
-        # M = 1
-        # N = 80
-
         M = A.shape[0]
         N = B.shape[0]
 
@@ -145,12 +145,6 @@ class DeepEMD(MetricModel):
         combination = F.relu(combination) + 1e-3
         return combination
 
-    # if args.shot > 1:
-    #     data_shot = model.module.get_sfc(data_shot)
-    # logits = model((data_shot.unsqueeze(0).repeat(num_gpu, 1, 1, 1, 1), data_query))
-    # acc = count_acc(logits, label) * 100
-
-    # 当shot>1时，需要使用get_sfc
     def get_sfc(self, support):
         support = support.squeeze(0)
         # init the proto
@@ -160,7 +154,6 @@ class DeepEMD(MetricModel):
 
         optimizer = torch.optim.SGD([SFC], lr=self.args.get("sfc_lr"), momentum=0.9, dampening=0.9, weight_decay=0)
 
-        # crate label for finetune
         label_shot = torch.arange(self.args.get("way")).repeat(self.args.get("shot"))
         label_shot = label_shot.type(torch.cuda.LongTensor)
 
@@ -185,13 +178,11 @@ class DeepEMD(MetricModel):
         num_proto = similarity_map.shape[1]
         _num_node = weight_1.shape[-1]
         if solver == 'opencv':  # use openCV solver
-
             for i in range(num_query):
                 for j in range(num_proto):
                     _, flow = emd_inference_opencv(1 - similarity_map[i, j, :, :], weight_1[i, j, :], weight_2[j, i, :])
                     similarity_map[i, j, :, :] = (similarity_map[i, j, :, :]) * torch.from_numpy(flow).cuda()
 
-            # print("opencv solver finished")
             temperature = (self.args.get("temperature") / _num_node)
             logitis = similarity_map.sum(-1).sum(-1) * temperature
             return logitis
@@ -221,7 +212,6 @@ class DeepEMD(MetricModel):
         else:
             return x
 
-    # FIXME: 这里应该就是proto.shape[0]对应shot,query.shape[0]对应query才对，但事实上不是
     def get_similiarity_map(self, proto, query):
 
         way = proto.shape[0]
@@ -278,3 +268,24 @@ class DeepEMD(MetricModel):
         feature_list.append(feature.view(feature.shape[0], feature.shape[1], 1, -1))
         out = torch.cat(feature_list, dim=-1)
         return out
+
+
+class DeepEMD(MetricModel):
+    def __init__(self, mode, emb_func,args, **kwargs):
+        super(DeepEMD, self).__init__(**kwargs)
+        self.deep_emd= Network(mode, emb_func,args, **kwargs)
+        print("trying to read model----------")
+        print("pretrain_path",args.get("pretrain_path"))
+        if args.get("pretrain_path") is not None:
+            print("----------------------model loaded----------------------------------------------------")
+            self.deep_emd.load_state_dict(torch.load(args.get("pretrain_path")))
+
+    def forward(self, batch):
+        return self.deep_emd.forward(batch)
+    def set_forward_loss(self, batch):
+        return self.deep_emd.set_forward_loss(batch)
+
+    def set_forward(self, batch):
+        return self.deep_emd.set_forward(batch)
+
+
