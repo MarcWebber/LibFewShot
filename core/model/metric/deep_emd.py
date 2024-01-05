@@ -87,6 +87,7 @@ class Network(MetricModel):
             logits = self.pre_train_forward(image)
             acc = accuracy(logits, label)
             output = self.forward_output(logits)
+            loss = self.loss_func(logits, label)/self.args.get("batch_size")
             return output, acc
 
         else:
@@ -100,7 +101,7 @@ class Network(MetricModel):
             logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
             output = self.forward_output(logits)
 
-            loss = self.loss_func(logits, label)/128
+            loss = self.loss_func(logits, label)/self.args.get("batch_size")
             acc = accuracy(logits, label)
             print(loss.item())
             return output, acc, loss
