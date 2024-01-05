@@ -87,7 +87,8 @@ class Network(MetricModel):
             logits = self.pre_train_forward(image)
             acc = accuracy(logits, label)
             output = self.forward_output(logits)
-            return output, acc
+            loss = self.loss_func(logits, label) / 128
+            return output, acc, loss
 
         else:
             data, label = self.reshuffle_data(image, label, self.args.get("way"))
