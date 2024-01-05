@@ -104,6 +104,25 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+        dense = False
+        if x.shape.__len__() == 5:  # batch of image patches
+            num_data, num_patch = x.shape[:2]
+            x = x.reshape(-1, x.shape[2], x.shape[3], x.shape[4])
+            x = self.simple_forward(x)
+            x = F.adaptive_avg_pool2d(x, 1)
+            x = x.reshape(num_data, num_patch, x.shape[1], x.shape[2], x.shape[3])
+            x = x.permute(0, 2, 1, 3, 4)
+            x = x.squeeze(-1)
+            return x
+        else:
+            x = self.simple_forward(x)
+            if dense == False:
+                return F.adaptive_avg_pool2d(x, 1)
+            if self.args.get("feature_pyramid") is not None:
+                x = self.build_feature_pyramid(x)
+        return x
+
+    def simple_forward(self, x):
         x = self.layer1(x)
 
         x = self.layer2(x)
@@ -113,7 +132,6 @@ class ResNet(nn.Module):
         x = self.layer4(x)
 
         return x
-
 
 
 

@@ -11,16 +11,30 @@ from core import Test
 
 
 # 5-1 
-# PATH = "./results/DeepEMD-miniImageNet--ravi-resnet12_emd-5-1-Jan-04-2024-17-31-25"
-# 5-5 
-PATH = "./results/DeepEMD-miniImageNet--ravi-resnet12_emd-5-5-Jan-04-2024-17-41-06"
+PATH = "./results/DeepEMD-miniImageNet--ravi-resnet12_emd-5-1-Jan-04-2024-17-31-25"
+
+# PATH = "./results/DeepEMD-miniImageNet--ravi-resnet12_emd-5-1-Jan-04-2024-12-10-53"
 VAR_DICT = {
-    "test_epoch": 5,
+    "test_epoch": 10,
     "device_ids": "0",
     "n_gpu": 1,
-    "test_episode": 20,
-    "episode_size": 2,
+    "test_episode": 100,
+    "episode_size": 1,
 }
+
+
+# 5-5 
+
+# PATH = "./results/DeepEMD-miniImageNet--ravi-resnet12_emd-5-5-Jan-04-2024-17-41-06"
+
+# for 5-5 other-wise it will run quite slowly
+# VAR_DICT = {
+#     "test_epoch": 5,
+#     "device_ids": "0",
+#     "n_gpu": 1,
+#     "test_episode": 20,
+#     "episode_size": 1,
+# }
 
 
 def main(rank, config):

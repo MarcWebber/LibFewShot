@@ -48,13 +48,12 @@ class Network(MetricModel):
     def set_forward(self, batch):
         image, _ = batch
         image = image.to(self.device)
+        label = torch.tensor(
+            [[i] * (self.args.get("query") + self.args.get("shot")) for i in range(self.args.get("way"))])
+        label = label.reshape(-1)
+        label = label.type(torch.cuda.LongTensor)
 
         if self.mode == 'pretrain':
-            label = torch.tensor(
-                [[i] * (self.args.get("query") + self.args.get("shot")) for i in range(self.args.get("way"))])
-            label = label.reshape(-1)
-            label = label.type(torch.cuda.LongTensor)
-
             # logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
             logits = self.pre_train_forward(image)
             acc = accuracy(logits, label)
@@ -62,10 +61,6 @@ class Network(MetricModel):
             return output, acc
 
         else:
-            label = torch.tensor(
-                [[i] * (self.args.get("query") + self.args.get("shot")) for i in range(self.args.get("way"))])
-            label = label.reshape(-1)
-            label = label.type(torch.cuda.LongTensor)
             data, label = self.reshuffle_data(image, label, self.args.get("way"))
             feat = self.emb_func(data)
             data_shot, data_query = feat[:self.k], feat[self.k:]
@@ -76,31 +71,25 @@ class Network(MetricModel):
             logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
             output = self.forward_output(logits)
 
-        acc = accuracy(logits, label)
-        return output, acc
+            acc = accuracy(logits, label)
+            return output, acc
 
     def set_forward_loss(self, batch):
         image, _ = batch
         image = image.to(self.device)
+        label = torch.tensor(
+            [[i] * (self.args.get("query") + self.args.get("shot")) for i in range(self.args.get("way"))])
+        label = label.reshape(-1)
+        label = label.type(torch.cuda.LongTensor)
 
         if self.mode == 'pretrain':
-            label = torch.tensor(
-                [[i] * (self.args.get("query") + self.args.get("shot")) for i in range(self.args.get("way"))])
-            label = label.reshape(-1)
-            label = label.type(torch.cuda.LongTensor)
-
             # logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
             logits = self.pre_train_forward(image)
-            loss = self.loss_func(logits, label)
             acc = accuracy(logits, label)
             output = self.forward_output(logits)
-            return output, acc, loss
+            return output, acc
 
         else:
-            label = torch.tensor(
-                [[i] * (self.args.get("query") + self.args.get("shot")) for i in range(self.args.get("way"))])
-            label = label.reshape(-1)
-            label = label.type(torch.cuda.LongTensor)
             data, label = self.reshuffle_data(image, label, self.args.get("way"))
             feat = self.emb_func(data)
             data_shot, data_query = feat[:self.k], feat[self.k:]
@@ -110,10 +99,10 @@ class Network(MetricModel):
             label = label[self.k:]
             logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
             output = self.forward_output(logits)
-            
-        loss = self.loss_func(logits, label)
-        acc = accuracy(logits, label)
-        return output, acc, loss
+
+            loss = self.loss_func(logits, label)
+            acc = accuracy(logits, label)
+            return output, acc, loss
 
     def set_forward_adaptation(self, proto, query):
         proto = proto.squeeze(0)

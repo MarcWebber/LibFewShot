@@ -2,35 +2,32 @@ import copy
 
 import torch
 import torch.nn as nn
-from .metric_model import MetricModel
+from .meta_model import MetaModel
 from core.model.backbone.utils.deep_emd import emd_inference_opencv, emd_inference_qpth
 from core.model.backbone.resnet_12_emd import ResNet
 import torch.nn.functional as F
 from core.utils import accuracy
 
 
-class Network(MetricModel):
+class Network(MetaModel):
 
-    def __init__(self, mode, emb_func_path,args, **kwargs):
+    def __init__(self, mode, num_classes, args, **kwargs):
         super(Network, self).__init__(**kwargs)
         self.mode = mode
-        self.emb_func = self._load_state_dict(self.emb_func, emb_func_path, False)
         self.args = args
+        self.num_classes = num_classes
         self.loss_func = nn.CrossEntropyLoss()
         self.encoder = ResNet()
+
+        self.emb_func_path = args.get("pretrain_path")
+        if self.emb_func_path is not None:
+            # print("load emb_func from----------------------------", self.emb_func_path)
+            self.emb_func.load_state_dict(torch.load(self.emb_func_path))
+
         self.k = self.args.get("way") * self.args.get("shot")
 
-        if self.mode == 'pre_train':
-            self.fc = nn.Linear(640, self.args.num_class)
-
-    def _load_state_dict(self, model, state_dict_path, is_distill):
-        new_model = None
-        if is_distill and state_dict_path is not None:
-            new_model = copy.deepcopy(model)
-            model_state_dict = torch.load(state_dict_path, map_location="cpu")
-            new_model.load_state_dict(model_state_dict)
-        return new_model
-
+        if self.mode == 'pretrain':
+            self.fc = nn.Linear(640, self.num_classes)
 
     def reshuffle_data(self, data_shot, labels, cls):
         label_len = labels.__len__()
@@ -47,20 +44,28 @@ class Network(MetricModel):
         else:
             return self.set_forward(batch)
 
+    def pre_train_forward(self, input):
+        return self.fc(self.encode(input).squeeze(-1).squeeze(-1))
+
     def set_forward(self, batch):
-        image, global_target = batch
+        image, _ = batch
         image = image.to(self.device)
-        global_target = global_target.to(self.device)
 
-        if self.mode == 'pre_train':
-            image, global_target = self.reshuffle_data(image, global_target.reshape(-1), self.way_num)
-            feat = self.emb_func(image)
-            label = global_target
+        if self.mode == 'pretrain':
+            label = torch.tensor(
+                [[i] * (self.args.get("query") + self.args.get("shot")) for i in range(self.args.get("way"))])
+            label = label.reshape(-1)
+            label = label.type(torch.cuda.LongTensor)
 
-            logits = self.fc(feat.squeeze(-1).squeeze(-1))
+            # logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
+            logits = self.pre_train_forward(image)
+            acc = accuracy(logits, label)
+            output = self.forward_output(logits)
+            return output, acc
 
         else:
-            label = torch.tensor([[i]*(self.args.get("query")+self.args.get("shot")) for i in range(self.args.get("way"))])
+            label = torch.tensor(
+                [[i] * (self.args.get("query") + self.args.get("shot")) for i in range(self.args.get("way"))])
             label = label.reshape(-1)
             label = label.type(torch.cuda.LongTensor)
             data, label = self.reshuffle_data(image, label, self.args.get("way"))
@@ -70,41 +75,44 @@ class Network(MetricModel):
                 data_shot = self.get_sfc(data_shot)
             # logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
             label = label[self.k:]
-            logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1),data_query)
+            logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
             output = self.forward_output(logits)
 
         acc = accuracy(logits, label)
         return output, acc
 
     def set_forward_loss(self, batch):
-        image, global_target = batch
+        image, _ = batch
         image = image.to(self.device)
-        global_target = global_target.to(self.device)
 
-        if self.mode == 'pre_train':
-            image, global_target = self.reshuffle_data(image, global_target.reshape(-1), self.way_num)
-            feat = self.emb_func(image)
-            label = global_target
+        if self.mode == 'pretrain':
+            label = torch.tensor(
+                [[i] * (self.args.get("query") + self.args.get("shot")) for i in range(self.args.get("way"))])
+            label = label.reshape(-1)
+            label = label.type(torch.cuda.LongTensor)
 
-            logits = self.fc(feat.squeeze(-1).squeeze(-1))
+            # logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
+            logits = self.pre_train_forward(image)
+            loss = self.loss_func(logits, label)
+            acc = accuracy(logits, label)
+            output = self.forward_output(logits)
+            return output, acc, loss
 
         else:
-            label = torch.tensor([[i]*(self.args.get("query")+self.args.get("shot")) for i in range(self.args.get("way"))])
+            label = torch.tensor(
+                [[i] * (self.args.get("query") + self.args.get("shot")) for i in range(self.args.get("way"))])
             label = label.reshape(-1)
             label = label.type(torch.cuda.LongTensor)
             data, label = self.reshuffle_data(image, label, self.args.get("way"))
-
             feat = self.emb_func(data)
-
             data_shot, data_query = feat[:self.k], feat[self.k:]
-
-
             if self.args.get("shot") > 1:
                 data_shot = self.get_sfc(data_shot)
+            # logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
             label = label[self.k:]
-            logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1),data_query)
+            logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
             output = self.forward_output(logits)
-
+            
         loss = self.loss_func(logits, label)
         acc = accuracy(logits, label)
         return output, acc, loss
@@ -123,9 +131,6 @@ class Network(MetricModel):
         else:
             logits = self.get_emd_distance(similarity_map, weight_1, weight_2, solver='qpth')
         return logits
-
-    def pre_train_forward(self, _input):
-        return self.fc(self.encode(_input, dense=False).squeeze(-1).squeeze(-1))
 
     def get_weight_vector(self, A, B):
         M = A.shape[0]
@@ -166,7 +171,7 @@ class Network(MetricModel):
                     batch_shot = support[selected_id, :]
                     batch_label = label_shot[selected_id]
                     optimizer.zero_grad()
-                    logits = self.emd_forward_1shot(SFC, batch_shot.detach())
+                    logits = self.set_forward_adaptation(SFC, batch_shot.detach())
                     loss = F.cross_entropy(logits, batch_label)
                     loss.backward()
                     optimizer.step()
@@ -270,22 +275,21 @@ class Network(MetricModel):
         return out
 
 
-class DeepEMD(MetricModel):
-    def __init__(self, mode, emb_func,args, **kwargs):
+class DeepEMD(MetaModel):
+    def __init__(self, mode, num_classes, args, **kwargs):
         super(DeepEMD, self).__init__(**kwargs)
-        self.deep_emd= Network(mode, emb_func,args, **kwargs)
-        print("trying to read model----------")
-        print("pretrain_path",args.get("pretrain_path"))
-        if args.get("pretrain_path") is not None:
-            print("----------------------model loaded----------------------------------------------------")
-            self.deep_emd.load_state_dict(torch.load(args.get("pretrain_path")))
+        self.deep_emd = Network(mode, num_classes, args, **kwargs)
+        # print("trying to read model----------")
+        # print("pretrain_path",args.get("pretrain_path"))
+        # if args.get("pretrain_path") is not None:
+        #     print("----------------------model loaded----------------------------------------------------")
+        #     self.deep_emd.load_state_dict(torch.load(args.get("pretrain_path")))
 
     def forward(self, batch):
         return self.deep_emd.forward(batch)
+
     def set_forward_loss(self, batch):
         return self.deep_emd.set_forward_loss(batch)
 
     def set_forward(self, batch):
         return self.deep_emd.set_forward(batch)
-
-
