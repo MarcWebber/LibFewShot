@@ -34,7 +34,7 @@ Cite this work with:
 
 **Classification**
 
-|      | Setups       | :book: *mini*ImageNet (5,1) | :computer: *mini*ImageNet (5,1)                                                 | :book:*mini*ImageNet (5,5) | :computer: *mini*ImageNet (5,5)                                               | :memo: Comments                     |
-| ---- |--------------| --------------------------- |---------------------------------------------------------------------------------| -------------------------- |-------------------------------------------------------------------------------| ----------------------------------- |
-| 1    | FCN - OPENCV | -                           | 63.47± 0.36[:clipboard:](./R2D2-miniImageNet--ravi-Conv64F-5-1-Table2.yaml)     | -                          | 80.373 ± 1.12[:clipboard:](./R2D2-miniImageNet--ravi-Conv64F-5-5-Table2.yaml) | 5-5由于训练和测试过慢，误差可能较大 |
-| 2    | FCN - QPTH   | -                           | 64.48± 0.39[:clipboard:](./R2D2-miniImageNet--ravi-resnet12-5-1-Table2.yaml)    | -                          |                                                                               |                                     |
+|      | Setups       | :book: *mini*ImageNet (5,1) | :computer: *mini*ImageNet (5,1)                                                         | :book:*mini*ImageNet (5,5) | :computer: *mini*ImageNet (5,5)                                                          | :memo: Comments                     |
+| ---- | ------------ | --------------------------- |-----------------------------------------------------------------------------------------| -------------------------- |------------------------------------------------------------------------------------------| ----------------------------------- |
+| 1    | FCN - OPENCV | -                           | 63.47± 0.36[:clipboard:](./DeepEMD-miniImageNet-ravi-resnet12_emd-5-1-fcn-Table2.yaml)  | -                          | 80.373 ± 1.12[:clipboard:](./DeepEMD-miniImageNet-ravi-resnet12_emd-5-5-fcn-Table2.yaml) | 5-5由于训练和测试过慢，误差可能较大 |
+| 2    | FCN - QPTH   | -                           | 64.08± 0.39[:clipboard:](./DeepEMD-miniImageNet-ravi-resnet12_emd-5-1-qpth-Table2.yaml) | -                          |                                                                                          |                                     |
