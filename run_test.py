@@ -10,9 +10,15 @@ from core import Test
 
 
 
-# 5-1 
-PATH = "./results/DeepEMD-miniImageNet--ravi-resnet12_emd-5-1-Jan-04-2024-17-31-25"
+# # 5-1 fcn
+# PATH = "./results/DeepEMD-miniImageNet--ravi-resnet12_emd-5-1-Jan-04-2024-17-31-25"
+PATH = "./results/DeepEMD-miniImageNet--ravi-resnet12_emd-5-1-Jan-05-2024-13-10-13"
 
+# 5-1 grid
+PATH = "./results/DeepEMD-miniImageNet--ravi-resnet12_emd-5-1-Jan-05-2024-12-35-14"
+
+# 5-1 sampling qpth
+# PATH = "./results/DeepEMD-miniImageNet--ravi-resnet12_emd-5-1-Jan-05-2024-12-42-27"
 # PATH = "./results/DeepEMD-miniImageNet--ravi-resnet12_emd-5-1-Jan-04-2024-12-10-53"
 VAR_DICT = {
     "test_epoch": 10,
@@ -23,7 +29,8 @@ VAR_DICT = {
 }
 
 
-# 5-5 
+
+# 5-5 fcn
 
 # PATH = "./results/DeepEMD-miniImageNet--ravi-resnet12_emd-5-5-Jan-04-2024-17-41-06"
 

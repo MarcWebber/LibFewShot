@@ -6,9 +6,9 @@ includes:
   - headers/optimizer.yaml
   - backbones/resnet12_emd.yaml
 
-train_episode: 5
+train_episode: 10
 epoch: 100
-episode_size: 1
+episode_size: 2
 batch_size: 128
 way_num: 5
 shot_num: 1
@@ -16,7 +16,7 @@ query_num: 15
 
 validation_episode: 5
 
-test_episode: 5
+test_episode: 10
 test_epoch: 2
 test_way: 5
 test_shot: 1

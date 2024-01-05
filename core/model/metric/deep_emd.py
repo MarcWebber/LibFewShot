@@ -14,7 +14,7 @@ class Network(MetricModel):
         self.mode = mode
         self.args = args
         self.num_classes = num_classes
-        self.loss_func = nn.CrossEntropyLoss()
+        self.loss_func = F.cross_entropy
         self.encoder = ResNet()
 
         self.emb_func_path = args.get("pretrain_path")
@@ -100,8 +100,9 @@ class Network(MetricModel):
             logits = self.set_forward_adaptation(data_shot.unsqueeze(0).repeat(1, 1, 1, 1, 1), data_query)
             output = self.forward_output(logits)
 
-            loss = self.loss_func(logits, label)
+            loss = self.loss_func(logits, label)/128
             acc = accuracy(logits, label)
+            print(loss.item())
             return output, acc, loss
 
     def set_forward_adaptation(self, proto, query):
