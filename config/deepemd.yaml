@@ -50,6 +50,7 @@ classifier:
       metric: cosine
       l2_strength: 0.000001
       sfc_update_step: 100
+      batch_size: 128
 
   name: DeepEMD
   
